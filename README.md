@@ -31,7 +31,7 @@ Go Music DL 是一个多平台音乐搜索与下载工具，支持 **Web**、**T
 ./music-dl -k "周杰伦"
 ```
 
-Web 的搜索、试听、下载和歌单浏览无需登录；修改设置或 Cookie 时才需要管理员账号。首次配置时，启动日志会打印 `Web setup token`，用它创建管理员账号即可。TUI 常用键：`↑/↓` 移动、`空格` 选择、`a` 全选、`r` 换源、`Enter` 下载、`w` 每日推荐、`q` 退出。
+Web 的搜索、试听、下载和歌单浏览无需登录；修改设置或 Cookie 时才需要管理员账号。首次打开 Web 时会直接进入初始化页面，填写用户名和密码即可创建管理员账号。TUI 常用键：`↑/↓` 移动、`空格` 选择、`a` 全选、`r` 换源、`Enter` 下载、`w` 每日推荐、`q` 退出。
 
 ### Docker
 
@@ -59,7 +59,7 @@ pwsh -NoProfile -File .\build-fpk.ps1 -Arch arm
 
 产物为 `dist/musicdl_<版本>_<架构>.fpk`。安装后在应用中心「Music-DL」打开，默认端口 **18081**，访问 `http://NAS地址:18081/music`；安装向导里可改端口。数据保存在应用数据目录，下载文件默认写入共享文件夹 `musicdl/downloads`（安装时自动创建软链），卸载时可选择是否保留数据。详见 [`fnos/README.md`](./fnos/README.md)。
 
-推送 `v*` 形式的 tag（如 `v1.2.0`）会触发 GitHub Actions（`.github/workflows/release-fpk.yml`）自动编译 x86 / arm 两套安装包，并连同 `SHA256SUMS.txt` 发布到 Releases。
+推送 `v*` 形式的 tag（如 `v1.2.0`）会触发 GitHub Actions（`.github/workflows/release.yml`），自动编译 x86 / arm 两套 FPK 与 Android APK，并把它们连同 `SHA256SUMS.txt` 一起发布到 Releases。
 
 ---
 
@@ -167,7 +167,13 @@ TUI 常用按键：
 
 ## GitHub Actions 自动构建
 
-本项目已配置 GitHub Actions 工作流。当推送代码并打上版本标签（如 `v1.0.0`）时，会自动触发 `.github/workflows/docker.yml`，构建跨平台镜像（支持 amd64 和 arm64）并推送到 DockerHub。
+项目合并为一个发布工作流 `.github/workflows/release.yml`（`Release (fnOS + Android)`）。推送 `v*` 形式标签（如 `v1.2.1`）或手动触发时，会并行：
+
+* 编译 x86 / arm 两套 fnOS 安装包（`.fpk`）
+* 在 `windows-latest` 上编译 Android APK
+* 把 FPK、APK 与 `SHA256SUMS.txt` 一并发布到 GitHub Releases
+
+其余构建（Docker 镜像、iOS、每日构建）不再由 Actions 执行。
 
 ### Android APK 构建
 
@@ -210,7 +216,7 @@ adb install -r music-dl.apk
 
 #### 2. Release 流程自动构建 APK
 
-`.github/workflows/release.yml` 中新增了 `build-android-apk` 任务。发布时会在 `windows-latest` 环境中：
+`.github/workflows/release.yml` 中的 `build-android` 任务会在发布时运行：
 
 * 安装 Go、JDK 17、Android SDK
 * 安装 `platform-tools`、`platforms;android-33`、`build-tools;34.0.0`、`ndk;27.0.12077973`

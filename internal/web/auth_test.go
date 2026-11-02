@@ -11,47 +11,6 @@ import (
 	"github.com/guohuiyuan/go-music-dl/core"
 )
 
-func TestPrepareSetupTokenLifecycle(t *testing.T) {
-	resetAuthRuntimeForTest()
-	t.Cleanup(resetAuthRuntimeForTest)
-
-	token, err := prepareSetupToken(core.WebAuthSettings{Username: core.DefaultWebAuthUsername})
-	if err != nil {
-		t.Fatalf("prepare setup token: %v", err)
-	}
-	if token == "" {
-		t.Fatal("setup token should not be empty")
-	}
-	if got := currentSetupToken(); got != token {
-		t.Fatalf("current setup token = %q, want %q", got, token)
-	}
-
-	again, err := prepareSetupToken(core.WebAuthSettings{Username: core.DefaultWebAuthUsername})
-	if err != nil {
-		t.Fatalf("prepare setup token again: %v", err)
-	}
-	if again != token {
-		t.Fatalf("setup token changed before consumption: got %q want %q", again, token)
-	}
-
-	consumeSetupToken()
-	if got := currentSetupToken(); got != "" {
-		t.Fatalf("setup token should be consumed, got %q", got)
-	}
-
-	configuredToken, err := prepareSetupToken(core.WebAuthSettings{
-		Username:      "owner",
-		PasswordHash:  "hash",
-		SessionSecret: "secret",
-	})
-	if err != nil {
-		t.Fatalf("prepare configured setup token: %v", err)
-	}
-	if configuredToken != "" {
-		t.Fatalf("configured auth should not have setup token, got %q", configuredToken)
-	}
-}
-
 func TestSessionValueValidation(t *testing.T) {
 	settings := core.WebAuthSettings{
 		Username:      "owner",

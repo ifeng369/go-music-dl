@@ -7360,7 +7360,7 @@ try {
     preload: "metadata",
     volume: 0.7,
     listFolded: false,
-    listMaxHeight: "660px",
+    listMaxHeight: "825px",
     lrcType: 3,
     audio: [],
   });
@@ -8341,7 +8341,6 @@ async function expandPlaybackQueue({local, url, totalPages}) {
     if (additions.length) ap.list.add(additions);
   };
   try {
-    showToast("正在补齐播放列表", "其他分页将自动加入，随机播放覆盖加载后的完整列表。", "info", 2500);
     if (local) {
       let offset = 0;
       while (!controller.signal.aborted) {
@@ -8370,7 +8369,6 @@ async function expandPlaybackQueue({local, url, totalPages}) {
         pages = parsePositiveInt(doc.querySelector(".pagination-bar")?.dataset.totalPages, 1);
       }
     }
-    if (!controller.signal.aborted) showToast("播放列表已补齐", `共 ${ap.list.audios.length} 首，随机播放不再局限当前页。`, "success", 3000);
   } catch (error) {
     if (!controller.signal.aborted) showToast("播放列表未加载完整", `${error.message}，已加载歌曲仍可播放；重新点击歌曲可重试。`, "error");
   } finally {
@@ -9986,7 +9984,7 @@ if (ap?.on) {
 // 播放清单默认最多展开到 20 首：少于 20 首时随内容自动增高，超过后才出现滚动条。
 // 说明：这里不写成模块级常量，避免早期初始化调用本函数时命中 const 暂时性死区。
 function playbackQueueMaxVisibleRows() {
-  return window.matchMedia("(max-width: 768px)").matches ? 6 : 20;
+  return window.matchMedia("(max-width: 768px)").matches ? 6 : 25;
 }
 
 function updatePlaybackQueueListHeight(ol, count) {

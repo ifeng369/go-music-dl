@@ -112,13 +112,11 @@ func TestIssue240SettingsAndPlayerPolish(t *testing.T) {
 		}
 	}
 
-	for _, want := range []string{
-		"Web setup token:",
-		`aria-describedby="setup-token-help"`,
-	} {
-		if !strings.Contains(authHTML, want) {
-			t.Fatalf("auth.html missing issue #240 token %q", want)
-		}
+	if strings.Contains(authHTML, "setup_token") || strings.Contains(authHTML, "Web setup token:") {
+		t.Fatal("auth.html should not require a setup token anymore")
+	}
+	if !strings.Contains(authHTML, `name="username"`) {
+		t.Fatal("auth.html missing username field")
 	}
 
 	if !strings.Contains(indexHTML, `id="locate-current-track"`) {

@@ -540,11 +540,8 @@ func StartWithOptions(port string, opts StartOptions) {
 	RoutePrefix = NormalizeBasePath(opts.BasePath)
 	core.CM.Load()
 	if !opts.DisableAuth {
-		settings, err := core.GetWebAuthSettings()
-		if err != nil {
+		if _, err := core.GetWebAuthSettings(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to read web auth settings: %v\n", err)
-		} else if token, tokenErr := prepareSetupToken(settings); tokenErr == nil && token != "" {
-			fmt.Printf("Web setup token: %s\nOpen %s/setup and keep this startup terminal private until setup is complete.\n", token, RoutePrefix)
 		}
 	}
 	InitDB()

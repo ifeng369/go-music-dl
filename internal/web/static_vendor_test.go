@@ -36,8 +36,6 @@ func TestPagesUseEmbeddedVendorAssets(t *testing.T) {
 	for _, asset := range []string{
 		"{{.Root}}/vendor/aplayer/APlayer.min.css",
 		"{{.Root}}/vendor/aplayer/APlayer.min.js",
-		"{{.Root}}/vendor/sakana/sakana.min.css",
-		"{{.Root}}/vendor/sakana/sakana.min.js",
 	} {
 		if !strings.Contains(indexBody, asset) {
 			t.Fatalf("index.html missing embedded asset %q", asset)
@@ -56,8 +54,6 @@ func TestEmbeddedVendorAssetsAreServed(t *testing.T) {
 		"aplayer/APlayer.min.js",
 		"fontawesome/css/all.min.css",
 		"fontawesome/webfonts/fa-solid-900.woff2",
-		"sakana/sakana.min.css",
-		"sakana/sakana.min.js",
 	} {
 		t.Run(name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/"+name, nil)

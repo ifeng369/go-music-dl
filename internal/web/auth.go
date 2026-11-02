@@ -23,7 +23,6 @@ const (
 	authCookieName      = "music_dl_session"
 	sessionMaxAge       = 7 * 24 * time.Hour
 	minAuthPasswordSize = 6
-	setupTokenBytes     = 24
 	loginLockBaseDelay  = time.Second
 	loginLockMaxDelay   = time.Minute
 )
@@ -45,7 +44,6 @@ type loginAttemptState struct {
 
 type authRuntimeState struct {
 	mu            sync.Mutex
-	setupToken    string
 	loginAttempts map[string]loginAttemptState
 }
 
@@ -57,37 +55,6 @@ func newAuthRuntimeState() *authRuntimeState {
 
 func resetAuthRuntimeForTest() {
 	authRuntime = newAuthRuntimeState()
-}
-
-func prepareSetupToken(settings core.WebAuthSettings) (string, error) {
-	authRuntime.mu.Lock()
-	defer authRuntime.mu.Unlock()
-
-	if authConfigured(settings) {
-		authRuntime.setupToken = ""
-		return "", nil
-	}
-	if authRuntime.setupToken != "" {
-		return authRuntime.setupToken, nil
-	}
-	token, err := randomToken(setupTokenBytes)
-	if err != nil {
-		return "", err
-	}
-	authRuntime.setupToken = token
-	return token, nil
-}
-
-func currentSetupToken() string {
-	authRuntime.mu.Lock()
-	defer authRuntime.mu.Unlock()
-	return authRuntime.setupToken
-}
-
-func consumeSetupToken() {
-	authRuntime.mu.Lock()
-	defer authRuntime.mu.Unlock()
-	authRuntime.setupToken = ""
 }
 
 func loginAttemptKey(c *gin.Context, username string) string {
@@ -338,11 +305,6 @@ func bindAuthRoutes(api *gin.RouterGroup) {
 			renderAuthPage(c, "setup", "请输入用户名", username)
 			return
 		}
-		setupToken := currentSetupToken()
-		if setupToken == "" || subtle.ConstantTimeCompare([]byte(c.PostForm("setup_token")), []byte(setupToken)) != 1 {
-			renderAuthPage(c, "setup", "初始化令牌不正确，请查看启动终端输出", username)
-			return
-		}
 		if len(password) < minAuthPasswordSize {
 			renderAuthPage(c, "setup", fmt.Sprintf("密码至少需要 %d 位", minAuthPasswordSize), username)
 			return
@@ -372,7 +334,6 @@ func bindAuthRoutes(api *gin.RouterGroup) {
 			renderAuthPage(c, "setup", "保存管理员账号失败", username)
 			return
 		}
-		consumeSetupToken()
 		sessionValue, err := createSessionValue(settings, time.Now())
 		if err != nil {
 			renderAuthPage(c, "setup", "创建登录会话失败", username)

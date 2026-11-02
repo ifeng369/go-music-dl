@@ -12,7 +12,6 @@
     
     <link rel="stylesheet" href="{{.Root}}/vendor/aplayer/APlayer.min.css">
     <link rel="stylesheet" href="{{.Root}}/vendor/fontawesome/css/all.min.css">
-    <link rel="stylesheet" href="{{.Root}}/vendor/sakana/sakana.min.css"/>
 </head>
 <body>
 
@@ -67,24 +66,11 @@
 
 <script>
     window.API_ROOT = "{{.Root}}";
-    window.sakanaInstance = null;
-
-    function initSakanaWidget() {
-        if (window.innerWidth > 768) {
-            window.sakanaInstance = new SakanaWidget().mount('#sakana-widget');
-        }
-    }
 </script>
 
 <script src="{{.Root}}/app.js"></script>
 {{template "videogen_modal" .}}
 <script src="{{.Root}}/videogen.js"></script>
-
-<div id="sakana-container" class="sakana-container">
-    <div id="sakana-widget"></div>
-</div>
-
-<script async onload="initSakanaWidget()" src="{{.Root}}/vendor/sakana/sakana.min.js"></script>
 
 </body>
 </html>
