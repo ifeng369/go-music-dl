@@ -462,6 +462,10 @@ func GetUserPlaylistsFunc(source string) UserPlaylistsFunc {
 		return qq.New(c).GetUserPlaylists
 	case "kugou":
 		return kugou.New(c).GetUserPlaylists
+	case "kuwo":
+		return func(page, limit int) ([]model.Playlist, error) {
+			return fetchKuwoUserPlaylists(c, page, limit)
+		}
 	case "soda":
 		return NewSodaClient(c).GetUserPlaylists
 	default:
@@ -470,7 +474,7 @@ func GetUserPlaylistsFunc(source string) UserPlaylistsFunc {
 }
 
 func GetUserPlaylistSourceNames() []string {
-	return []string{"netease", "qq", "kugou", "soda"}
+	return []string{"netease", "qq", "kugou", "kuwo", "soda"}
 }
 
 func GetRecommendSourceNames() []string {

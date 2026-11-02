@@ -1,0 +1,17 @@
+appname         = musicdl
+version         = 1.2.0
+display_name    = Music-DL
+platform        = x86
+maintainer      = guohuiyuan
+maintainer_url  = https://github.com/guohuiyuan/go-music-dl
+distributor     = guohuiyuan
+distributor_url = https://github.com/guohuiyuan/go-music-dl
+desktop_uidir   = ui
+desktop_applaunchname = musicdl.Application
+service_port    = 18081
+checkport       = false
+desc            = 聚合音乐搜索与下载工具，支持网易云/QQ/酷狗/酷我/咪咕等多平台，Web 界面试听、下载、歌单专辑管理，支持本地音乐音质提升。
+source          = thirdparty
+os_min_version  = 1.1.8
+disable_authorization_path = false
+checksum        =

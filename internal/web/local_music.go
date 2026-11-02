@@ -680,6 +680,8 @@ func RegisterLocalMusicRoutes(api *gin.RouterGroup) {
 			"failed":    failed,
 		})
 	})
+
+	registerLocalMusicUpgradeRoutes(api)
 }
 
 func isLocalMusicSource(source string) bool {

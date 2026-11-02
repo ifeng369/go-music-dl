@@ -1,0 +1,15 @@
+{
+    ".url": {
+        "musicdl.Application":
+        {
+            "title": "Music-DL",
+            "desc": "聚合音乐搜索与下载",
+            "icon": "images/{0}.png",
+            "type": "url",
+            "port": "18081",
+            "protocol": "http",
+            "url": "/music",
+            "allUsers": true
+        }
+    }
+}

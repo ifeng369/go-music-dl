@@ -1,0 +1,237 @@
+#!/bin/bash
+# Music-DL — fnOS native binary service setup
+
+APP_DIR="${TRIM_APPDEST}"
+APP_DATA_DIR="${TRIM_PKGVAR}"
+
+LOG_FILE="${APP_DATA_DIR}/${TRIM_APPNAME}.log"
+PID_FILE="${APP_DATA_DIR}/${TRIM_APPNAME}.pid"
+
+DEFAULT_PORT=18081
+PORT_SAVE="${APP_DATA_DIR}/.port"
+UI_CONFIG_FILE="/var/apps/${TRIM_APPNAME}/ui/config"
+INSTALL_VARIABLES_FILE="/var/apps/${TRIM_APPNAME}/etc/installer-variables"
+
+# 安装向导里填写的端口（保存于 installer-variables，仅当向导变量未注入时兜底）
+saved_wizard_port() {
+    [ -f "${INSTALL_VARIABLES_FILE}" ] || return 0
+    sed -n 's/^wizard_port=//p' "${INSTALL_VARIABLES_FILE}" 2>/dev/null | tail -n 1 | tr -d '"[:space:]'
+}
+
+# 读取当前生效端口：优先安装/配置向导，其次已保存值，再次安装记录，最后默认值
+current_port() {
+    local port="${wizard_port:-}"
+    if [ -z "${port}" ] && [ -f "${PORT_SAVE}" ]; then
+        port="$(cat "${PORT_SAVE}" 2>/dev/null | tr -d '[:space:]')"
+    fi
+    [ -z "${port}" ] && port="$(saved_wizard_port)"
+    [ -z "${port}" ] && port="${DEFAULT_PORT}"
+    printf '%s' "${port}"
+}
+
+SVC_BACKGROUND=y
+SVC_WRITE_PID=y
+
+# 启动器：端口在进程启动时从 .port 读取，避免端口被占用自动顺延后仍用旧端口启动
+write_launcher() {
+    local launcher="${APP_DIR}/bin/music-dl-run"
+    mkdir -p "${APP_DIR}/bin" 2>/dev/null || true
+    cat > "${launcher}" <<EOF 2>/dev/null || true
+#!/bin/sh
+PORT="\$(cat "${PORT_SAVE}" 2>/dev/null | tr -d '[:space:]')"
+[ -z "\$PORT" ] && PORT=${DEFAULT_PORT}
+exec "${APP_DIR}/bin/music-dl" web --port "\$PORT" --no-browser
+EOF
+    chmod 755 "${launcher}" 2>/dev/null || true
+}
+
+SERVICE_COMMAND="${APP_DIR}/bin/music-dl-run"
+
+# 数据目录与共享文件夹
+data_dir() {
+    mkdir -p "${APP_DATA_DIR}/data" 2>/dev/null || true
+}
+
+# 应用以 package 用户运行，安装时目录由 root 创建，必须把数据目录交给运行用户，否则服务启动后会因无法写数据库立即退出
+ensure_owner() {
+    [ -n "${TRIM_USERNAME:-}" ] || return 0
+    local owner="${TRIM_USERNAME}:${TRIM_GROUPNAME:-${TRIM_USERNAME}}"
+    chown -Rh "${owner}" "${APP_DATA_DIR}" 2>/dev/null || true
+}
+
+first_share_path() {
+    [ -z "${TRIM_DATA_SHARE_PATHS:-}" ] && return
+    printf '%s' "${TRIM_DATA_SHARE_PATHS}" | tr ':\n' '\n' | while IFS= read -r p; do
+        p="$(printf '%s' "${p}" | sed 's/[[:space:]]*$//')"
+        if [ -n "${p}" ] && [ -d "${p}" ]; then
+            printf '%s' "${p}"
+            break
+        fi
+    done
+}
+
+# 把默认下载目录（data/downloads）软链到共享文件夹，避免下载文件落在隐藏的应用数据目录
+link_download_dir() {
+    local share
+    share="$(first_share_path)"
+    [ -z "${share}" ] && return
+    data_dir
+    mkdir -p "${share}/downloads" 2>/dev/null || return
+    if [ -n "${TRIM_USERNAME:-}" ]; then
+        chown -Rh "${TRIM_USERNAME}:${TRIM_GROUPNAME:-${TRIM_USERNAME}}" "${share}/downloads" 2>/dev/null || true
+    fi
+    if [ -L "${APP_DATA_DIR}/data/downloads" ]; then
+        ln -sfn "${share}/downloads" "${APP_DATA_DIR}/data/downloads" 2>/dev/null || true
+    elif [ ! -e "${APP_DATA_DIR}/data/downloads" ]; then
+        ln -sfn "${share}/downloads" "${APP_DATA_DIR}/data/downloads" 2>/dev/null || true
+    fi
+}
+
+# 保存端口并同步端口转发规则、桌面图标入口
+apply_port() {
+    local port="$1"
+    [ -z "${port}" ] && return
+    case "${port}" in
+        *[!0-9]*)
+            install_log "Invalid port: ${port}"
+            return
+            ;;
+    esac
+    echo "${port}" > "${PORT_SAVE}" 2>/dev/null || true
+
+    if [ -f "${FWPORTS_FILE}" ]; then
+        sed -i "s|^src\.ports=.*|src.ports=\"${port}/tcp\"|" "${FWPORTS_FILE}" 2>/dev/null || true
+        sed -i "s|^dst\.ports=.*|dst.ports=\"${port}/tcp\"|" "${FWPORTS_FILE}" 2>/dev/null || true
+    fi
+
+    if [ -f "${UI_CONFIG_FILE}" ]; then
+        sed -i -E "s/(\"port\"[[:space:]]*:[[:space:]]*)\"?[0-9]+\"?/\1\"${port}\"/" "${UI_CONFIG_FILE}" 2>/dev/null || true
+    fi
+
+    # 应用中心入口的端口取自已安装的 manifest（service_port），必须同步，否则图标仍指向旧端口
+    local manifest_file="/var/apps/${TRIM_APPNAME}/manifest"
+    if [ -f "${manifest_file}" ]; then
+        sed -i -E "s/^service_port[[:space:]]*=.*/service_port    = ${port}/" "${manifest_file}" 2>/dev/null || true
+    fi
+    install_log "Applied port: ${port}"
+}
+
+# 端口是否已被监听（未安装 ss/netstat 时按“未占用”处理，避免误判）
+port_in_use() {
+    local port="$1"
+    [ -z "${port}" ] && return 1
+    if command -v ss >/dev/null 2>&1; then
+        ss -ltn 2>/dev/null | awk 'NR > 1 { print $4 }' | grep -Eq "[:.]${port}$"
+    elif command -v netstat >/dev/null 2>&1; then
+        netstat -ltn 2>/dev/null | awk 'NR > 2 { print $4 }' | grep -Eq "[:.]${port}$"
+    else
+        return 1
+    fi
+}
+
+# 从指定端口开始向后找一个可用端口（最多尝试 20 个）
+pick_free_port() {
+    local base="$1" offset port
+    for offset in $(seq 0 20); do
+        port=$((base + offset))
+        [ "${port}" -gt 65535 ] && break
+        [ "${port}" -lt 1024 ] && continue
+        if ! port_in_use "${port}"; then
+            printf '%s' "${port}"
+            return 0
+        fi
+    done
+    printf '%s' "${base}"
+}
+
+# 安装/启动前校验端口：本应用未运行时若端口被占用，则自动顺延并记录日志
+ensure_port_available() {
+    local requested="$1"
+    [ -z "${requested}" ] && requested="${DEFAULT_PORT}"
+    case "${requested}" in
+        *[!0-9]*) requested="${DEFAULT_PORT}" ;;
+    esac
+    if daemon_status >/dev/null 2>&1; then
+        printf '%s' "${requested}"
+        return 0
+    fi
+    if ! port_in_use "${requested}"; then
+        printf '%s' "${requested}"
+        return 0
+    fi
+    local free
+    free="$(pick_free_port "${requested}")"
+    if [ "${free}" != "${requested}" ]; then
+        install_log "Port ${requested} is already in use, switched to ${free}"
+        printf '端口 %s 已被占用，已自动改用 %s\n' "${requested}" "${free}" >> "${LOG_FILE}" 2>/dev/null || true
+    else
+        install_log "Port ${requested} is already in use and no nearby free port was found"
+    fi
+    printf '%s' "${free}"
+}
+
+service_prestart() {
+    data_dir
+    link_download_dir
+    ensure_owner
+    # 启动前检测端口占用：被别的程序占用时自动顺延，启动器按 .port 启动
+    local port
+    port="$(ensure_port_available "$(current_port)")"
+    apply_port "${port}"
+    write_launcher
+    install_log "Service command: ${SERVICE_COMMAND} (port ${port})"
+}
+
+service_postinst() {
+    data_dir
+    link_download_dir
+    local port="${wizard_port:-}"
+    [ -z "${port}" ] && port="$(saved_wizard_port)"
+    port="$(ensure_port_available "${port:-$(current_port)}")"
+    apply_port "${port}"
+    write_launcher
+    ensure_owner
+    chmod +x "${APP_DIR}/bin/music-dl" 2>/dev/null || true
+}
+
+service_preupgrade() {
+    for f in .port; do
+        [ -f "${APP_DATA_DIR}/${f}" ] && cp "${APP_DATA_DIR}/${f}" "${APP_DATA_DIR}/${f}.bak"
+    done
+}
+
+service_restore() {
+    for f in .port; do
+        if [ -f "${APP_DATA_DIR}/${f}.bak" ]; then
+            cp "${APP_DATA_DIR}/${f}.bak" "${APP_DATA_DIR}/${f}"
+            rm -f "${APP_DATA_DIR}/${f}.bak"
+        fi
+    done
+    data_dir
+    link_download_dir
+    apply_port "$(ensure_port_available "$(current_port)")"
+    write_launcher
+    ensure_owner
+    chmod +x "${APP_DIR}/bin/music-dl" 2>/dev/null || true
+}
+
+service_postconfig() {
+    data_dir
+    link_download_dir
+    local port="${wizard_port:-}"
+    [ -z "${port}" ] && port="$(saved_wizard_port)"
+    port="$(ensure_port_available "${port:-$(current_port)}")"
+    apply_port "${port}"
+    write_launcher
+    ensure_owner
+}
+
+service_preuninst() {
+    pkill -x "music-dl" 2>/dev/null || true
+    sleep 1
+    pkill -9 -x "music-dl" 2>/dev/null || true
+}
+
+service_poststop() {
+    service_preuninst
+}

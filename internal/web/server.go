@@ -259,7 +259,7 @@ func cookieCaptureHints() map[string]cookieCaptureHint {
 		"kuwo": {
 			LoginURL: "https://www.kuwo.cn",
 			Domain:   "www.kuwo.cn",
-			Hint:     "登录并播放一首歌，筛选同域请求。",
+			Hint:     "登录并播放一首歌，筛选同域请求；Cookie 中需包含 userid 才能读取个人歌单。",
 		},
 		"migu": {
 			LoginURL: "https://music.migu.cn",

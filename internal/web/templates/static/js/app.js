@@ -3338,6 +3338,9 @@ function renderLocalMusicPageCard(track) {
                 <button type="button" class="btn-circle btn-play" title="播放" onclick="playAllAndJumpTo(this)">
                     <i class="fa-solid fa-play"></i>
                 </button>
+                <button type="button" class="btn-circle btn-quality" title="音质替换" onclick="openLocalQualityMenu(this)">
+                    <i class="fa-solid fa-arrow-up-right-dots"></i>
+                </button>
                 <button type="button" class="btn-circle btn-fav" title="收藏到自制歌单" onclick="openAddToCollectionModal(this)">
                     <i class="fa-regular fa-heart"></i>
                 </button>
@@ -3349,6 +3352,606 @@ function renderLocalMusicPageCard(track) {
             </div>
         </li>
     `;
+}
+
+let localQualityPopover = null;
+let localQualityRequestSeq = 0;
+
+function closeLocalQualityMenu() {
+  localQualityRequestSeq += 1;
+  if (localQualityPopover) {
+    localQualityPopover.remove();
+    localQualityPopover = null;
+  }
+  document.removeEventListener("click", handleLocalQualityOutsideClick, true);
+  document.removeEventListener("keydown", handleLocalQualityKeydown, true);
+}
+
+function handleLocalQualityOutsideClick(event) {
+  if (!localQualityPopover) return;
+  if (localQualityPopover.contains(event.target)) return;
+  if (event.target && event.target.closest && event.target.closest(".btn-quality")) {
+    return;
+  }
+  closeLocalQualityMenu();
+}
+
+function handleLocalQualityKeydown(event) {
+  if (event.key === "Escape") closeLocalQualityMenu();
+}
+
+function setLocalQualityBody(html) {
+  if (!localQualityPopover) return;
+  const body = localQualityPopover.querySelector(".local-quality-body");
+  if (body) body.innerHTML = html;
+}
+
+function positionLocalQualityPopover(popover, anchor) {
+  const rect = anchor.getBoundingClientRect();
+  const width = Math.min(336, window.innerWidth - 24);
+  popover.style.width = `${width}px`;
+  const left = Math.min(Math.max(12, rect.right - width), window.innerWidth - width - 12);
+  popover.style.left = `${left}px`;
+  popover.style.top = `${rect.bottom + 8}px`;
+  requestAnimationFrame(() => {
+    if (!popover.isConnected) return;
+    const height = popover.offsetHeight;
+    if (rect.bottom + 8 + height > window.innerHeight - 12) {
+      popover.style.top = `${Math.max(12, rect.top - height - 8)}px`;
+    }
+  });
+}
+
+async function openLocalQualityMenu(btn) {
+  const card = btn && btn.closest ? btn.closest(".song-card") : null;
+  const song = songFromCard(card);
+  if (!song) return;
+
+  const sameSong = localQualityPopover && localQualityPopover.dataset.songId === song.id;
+  closeLocalQualityMenu();
+  if (sameSong) return;
+
+  const popover = document.createElement("div");
+  popover.className = "local-quality-popover";
+  popover.dataset.songId = song.id;
+  popover.innerHTML = `
+    <div class="local-quality-header">
+      <div class="local-quality-title">音质替换</div>
+      <button type="button" class="local-quality-close" aria-label="关闭">&times;</button>
+    </div>
+    <div class="local-quality-body">
+      <div class="local-quality-loading"><i class="fa-solid fa-spinner fa-spin"></i> 正在比对各平台音质...</div>
+    </div>`;
+  document.body.appendChild(popover);
+  localQualityPopover = popover;
+  positionLocalQualityPopover(popover, btn);
+  popover.querySelector(".local-quality-close")?.addEventListener("click", closeLocalQualityMenu);
+  document.addEventListener("click", handleLocalQualityOutsideClick, true);
+  document.addEventListener("keydown", handleLocalQualityKeydown, true);
+
+  const seq = localQualityRequestSeq;
+  try {
+    const params = new URLSearchParams({
+      id: song.id,
+      duration: String(song.duration || 0),
+    });
+    const response = await fetch(`${API_ROOT}/local_music/quality_options?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.error) {
+      throw new Error((payload && payload.error) || "获取音质列表失败");
+    }
+    if (seq !== localQualityRequestSeq || !localQualityPopover) return;
+    renderLocalQualityMenu(payload);
+  } catch (error) {
+    if (seq !== localQualityRequestSeq) return;
+    if (!localQualityPopover) return;
+    setLocalQualityBody(
+      `<div class="local-quality-empty is-error">${escapeHTML(error.message || "获取音质列表失败")}</div>`,
+    );
+  }
+}
+
+function renderLocalQualityMenu(payload) {
+  const local = payload.local || {};
+  const options = Array.isArray(payload.options) ? payload.options : [];
+  const currentHTML = `
+    <div class="local-quality-current">
+      <div class="local-quality-current-name">${escapeHTML(local.name || "")}</div>
+      <div class="local-quality-current-meta">
+        <span class="local-quality-tag">${escapeHTML(String(local.ext || "").toUpperCase() || "-")}</span>
+        <span class="local-quality-tag">${escapeHTML(local.bitrate_text || "-")}</span>
+        <span class="local-quality-tag">${escapeHTML(local.size_text || "-")}</span>
+        <span class="local-quality-tag is-tier">当前 ${escapeHTML(local.tier_text || "未知")}</span>
+      </div>
+    </div>`;
+
+  if (!options.length) {
+    setLocalQualityBody(
+      `${currentHTML}<div class="local-quality-empty">没有找到可替换的音源，试试先在设置里登录各平台或补充 Cookie。</div>`,
+    );
+    return;
+  }
+
+  const rowsHTML = options
+    .map((option, index) => {
+      const candidate = option.song || {};
+      const songLabel = [candidate.name, candidate.artist].filter(Boolean).join(" - ");
+      const scoreText = option.score ? `匹配度 ${Math.round(option.score * 100)}%` : "";
+      const titleText = [songLabel, scoreText].filter(Boolean).join(" · ");
+      return `
+      <button type="button" class="local-quality-row" data-index="${index}" title="${escapeHTML(titleText)}">
+        <span class="local-quality-source">${escapeHTML(option.source_label || option.source)}</span>
+        <span class="local-quality-badge tier-${escapeHTML(option.tier || "unknown")}">${escapeHTML(option.quality || "-")}</span>
+        <span class="local-quality-size">${escapeHTML(option.size_text || "-")}</span>
+        ${option.improvement ? '<span class="local-quality-upgrade">可提升音质</span>' : ""}
+      </button>`;
+    })
+    .join("");
+
+  setLocalQualityBody(`${currentHTML}<div class="local-quality-list">${rowsHTML}</div>`);
+  if (!localQualityPopover) return;
+  localQualityPopover.querySelectorAll(".local-quality-row").forEach((row) => {
+    row.addEventListener("click", () => {
+      const option = options[Number(row.dataset.index)];
+      if (option) applyLocalQualityOption(local, option, row);
+    });
+  });
+}
+
+async function applyLocalQualityOption(local, option, row) {
+  const sourceLabel = option.source_label || option.source || "该平台";
+  const candidate = option.song || {};
+  const candidateLabel = [candidate.name, candidate.artist].filter(Boolean).join(" - ");
+  const confirmed = window.confirm(
+    `使用 ${sourceLabel} 的 ${option.quality || "音源"}（${option.size_text || "未知大小"}）替换当前文件？\n\n音源：${candidateLabel || "未知"}\n原文件会被直接覆盖，无法恢复。`,
+  );
+  if (!confirmed) return;
+
+  const rows = localQualityPopover ? localQualityPopover.querySelectorAll(".local-quality-row") : [];
+  rows.forEach((item) => {
+    item.disabled = true;
+  });
+  const originalHTML = row ? row.innerHTML : "";
+  if (row) {
+    row.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 正在下载并替换...';
+  }
+
+  try {
+    const response = await fetch(`${API_ROOT}/local_music/upgrade`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      credentials: "same-origin",
+      body: JSON.stringify({
+        local_id: local.id,
+        source: option.source,
+        song: option.song,
+      }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.error) {
+      throw new Error((payload && payload.error) || "替换失败");
+    }
+
+    closeLocalQualityMenu();
+    showToast(
+      "音质替换完成",
+      `${sourceLabel} · ${option.quality || ""} · ${option.size_text || ""}`,
+      "success",
+      4000,
+    );
+    if (payload.warning) {
+      showToast("替换提示", payload.warning, "warning", 6000);
+    }
+    refreshLocalQualityPlayback(payload.old_id || local.id, payload.track);
+    await refreshLocalMusicPageAfterMutation();
+  } catch (error) {
+    rows.forEach((item) => {
+      item.disabled = false;
+    });
+    if (row && row.isConnected) row.innerHTML = originalHTML;
+    showToast("替换失败", error.message || "请稍后重试", "error", 6000);
+  }
+}
+
+function refreshLocalQualityPlayback(oldId, track) {
+  if (!ap || !ap.list || !Array.isArray(ap.list.audios) || !track) return;
+  const song = localMusicSongFromTrack(track);
+  const index = ap.list.audios.findIndex((audio) => {
+    const ids = [audio.custom_id, audio.original_id].map((value) => String(value || ""));
+    return ids.includes(String(oldId)) || ids.includes(String(track.id));
+  });
+  if (index === -1) return;
+
+  const audio = ap.list.audios[index];
+  const isCurrent = ap.list.index === index;
+  const position = isCurrent && ap.audio ? Number(ap.audio.currentTime) || 0 : 0;
+
+  audio.name = song.name;
+  audio.artist = song.artist;
+  audio.album = song.album || "";
+  audio.cover = song.cover || "";
+  audio.custom_id = song.id;
+  audio.original_id = song.id;
+  audio.source = song.source;
+  audio.duration = song.duration || 0;
+  audio.extra = serializeSongExtra(song.extra);
+  audio.url = `${buildStreamURL(song.id, song.source, song.name, song.artist, song.album || "", song.cover || "", audio.extra)}&_=${Date.now()}`;
+  const lyricURLs = lyricURLsForPlayback(song);
+  audio.lrc = lyricURLs.line;
+  audio.raw_lrc = lyricURLs.auto;
+
+  if (isCurrent) {
+    ap.list.switch(index);
+    if (position > 1) {
+      setTimeout(() => {
+        if (!ap || !ap.audio) return;
+        try {
+          ap.seek(position);
+        } catch (_) {}
+      }, 400);
+    }
+  }
+}
+
+// ===== 本地音乐一键音质提升 =====
+let localUpgradeScanItems = [];
+let localUpgradePollTimer = null;
+let localUpgradeBatchTotal = 0;
+const localUpgradeSelections = new Map();
+
+function ensureLocalUpgradeModal() {
+  let overlay = document.getElementById("localUpgradeModal");
+  if (overlay) return overlay;
+
+  overlay = document.createElement("div");
+  overlay.id = "localUpgradeModal";
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal local-upgrade-modal" role="dialog" aria-modal="true" aria-labelledby="localUpgradeTitle">
+      <div class="modal-header">
+        <div>
+          <h3 id="localUpgradeTitle"><i class="fa-solid fa-arrow-up-right-dots"></i> 音质提升</h3>
+          <p class="local-upgrade-subtitle">扫描整个本地曲库，找出各平台存在更高音质的版本</p>
+        </div>
+        <span class="modal-close" role="button" tabindex="0" aria-label="关闭" onclick="closeLocalUpgradeModal()">&times;</span>
+      </div>
+      <div class="modal-body" id="localUpgradeBody"></div>
+      <div class="local-upgrade-actions" id="localUpgradeActions"></div>
+    </div>`;
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closeLocalUpgradeModal();
+  });
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function closeLocalUpgradeModal() {
+  stopLocalUpgradePolling();
+  const overlay = document.getElementById("localUpgradeModal");
+  if (overlay) overlay.style.display = "none";
+}
+
+function stopLocalUpgradePolling() {
+  if (localUpgradePollTimer) {
+    clearTimeout(localUpgradePollTimer);
+    localUpgradePollTimer = null;
+  }
+}
+
+function setLocalUpgradeContent(bodyHTML, actionsHTML) {
+  const body = document.getElementById("localUpgradeBody");
+  const actions = document.getElementById("localUpgradeActions");
+  if (body) {
+    body.innerHTML = bodyHTML;
+    body.scrollTop = 0;
+    const list = body.querySelector(".local-upgrade-list");
+    if (list) list.scrollTop = 0;
+  }
+  if (actions) actions.innerHTML = actionsHTML || "";
+}
+
+async function localUpgradeRequest(path, options = {}) {
+  const res = await fetch(`${API_ROOT}${path}`, {
+    method: options.method || "GET",
+    headers: {
+      Accept: "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.method === "POST" ? { "X-Requested-With": "XMLHttpRequest" } : {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (_) {
+    data = null;
+  }
+  if (!res.ok) {
+    const message = data && data.error ? data.error : `请求失败（${res.status}）`;
+    throw new Error(message);
+  }
+  return data || {};
+}
+
+function localUpgradeProgressHTML(progress, total) {
+  const percent = total > 0 ? Math.min(100, Math.round((progress * 100) / total)) : 0;
+  return `<div class="local-upgrade-progress"><div class="local-upgrade-progress-fill" style="width:${percent}%"></div></div>`;
+}
+
+async function openLocalQualityUpgrade(force) {
+  ensureLocalUpgradeModal().style.display = "flex";
+  localUpgradeScanItems = [];
+  localUpgradeSelections.clear();
+  setLocalUpgradeContent(
+    `<div class="local-upgrade-hint"><i class="fa-solid fa-spinner fa-spin"></i> 正在启动检测…</div>`,
+    `<button type="button" class="ctrl-btn" onclick="closeLocalUpgradeModal()">关闭</button>`,
+  );
+  try {
+    await localUpgradeRequest(`/local_music/upgrade_scan${force ? "?refresh=1" : ""}`, { method: "POST" });
+    startLocalUpgradeScanPolling();
+  } catch (err) {
+    setLocalUpgradeContent(`<div class="local-upgrade-hint error">${escapeHTML(err.message)}</div>`, `<button type="button" class="ctrl-btn" onclick="closeLocalUpgradeModal()">关闭</button>`);
+  }
+}
+
+function startLocalUpgradeScanPolling() {
+  stopLocalUpgradePolling();
+  const tick = async () => {
+    try {
+      const data = await localUpgradeRequest("/local_music/upgrade_scan/status");
+      renderLocalUpgradeScan(data);
+      if (data.running) {
+        localUpgradePollTimer = setTimeout(tick, 1200);
+        return;
+      }
+      localUpgradePollTimer = null;
+    } catch (_) {
+      localUpgradePollTimer = setTimeout(tick, 2000);
+    }
+  };
+  tick();
+}
+
+function renderLocalUpgradeScan(data) {
+  localUpgradeScanItems = data.items || [];
+  const scanning = !!data.running;
+  const rows = localUpgradeScanItems
+    .map((item) => {
+      const options = localUpgradeItemOptions(item);
+      const chosen = localUpgradeChosenOption(item);
+      const optionRows = options
+        .map(
+          (option, index) => `
+          <button type="button" class="local-upgrade-option${option === chosen ? " is-selected" : ""}" onclick="pickLocalUpgradeOption(this, ${index})">
+            <span class="local-quality-badge tier-${escapeHTML(option.tier || "unknown")}">${escapeHTML(option.quality || "-")}</span>
+            <span class="local-upgrade-option-source">${escapeHTML(option.source_label || option.source)}</span>
+            <span class="local-upgrade-option-size">${escapeHTML(option.size_text || "-")}</span>
+            ${option.improvement ? "" : '<span class="local-upgrade-option-tag">低于当前</span>'}
+          </button>`,
+        )
+        .join("");
+      return `
+      <li class="local-upgrade-row" data-item-id="${escapeHTML(item.id)}">
+        <div class="local-upgrade-main">
+          <div class="local-upgrade-song">
+            <strong>${escapeHTML(item.name)}</strong>
+            <span>${escapeHTML(item.artist || "")}</span>
+          </div>
+          <div class="local-upgrade-current">${escapeHTML(item.current_quality)}</div>
+          <i class="fa-solid fa-arrow-right local-upgrade-arrow"></i>
+          <div class="local-upgrade-picker">
+            <button type="button" class="local-upgrade-pick${options.length > 1 ? " has-options" : ""}" onclick="toggleLocalUpgradeOptions(this)" title="${options.length > 1 ? "点击选择其他音源" : "该歌曲仅有一个可用音源"}">
+              ${localUpgradePickContent(chosen)}
+            </button>
+            <div class="local-upgrade-options" hidden>${optionRows}</div>
+          </div>
+        </div>
+      </li>`;
+    })
+    .join("");
+
+  let bodyHTML = scanning
+    ? `<div class="local-upgrade-summary"><i class="fa-solid fa-spinner fa-spin"></i> 正在检测 ${data.scanned}/${data.total}，已发现 <strong>${localUpgradeScanItems.length}</strong> 首可提升</div>${localUpgradeProgressHTML(data.scanned, data.total)}`
+    : `<div class="local-upgrade-summary">检测完成，共发现 <strong>${localUpgradeScanItems.length}</strong> 首可提升（已检测 ${data.scanned}/${data.total}）</div>`;
+
+  if (data.error) {
+    bodyHTML += `<div class="local-upgrade-hint error">${escapeHTML(data.error)}</div>`;
+  }
+  if (!scanning && localUpgradeScanItems.length === 0 && !data.error) {
+    bodyHTML += `<div class="local-upgrade-hint">没有找到可提升音质的版本。请确认对应平台已登录（Cookie），或稍后重试。</div>`;
+  }
+  if (localUpgradeScanItems.length > 0) {
+    bodyHTML += `<ul class="local-upgrade-list">${rows}</ul>`;
+  }
+
+  const closeBtn = `<button type="button" class="ctrl-btn" onclick="closeLocalUpgradeModal()">关闭</button>`;
+  const rescanBtn = `<button type="button" class="ctrl-btn" onclick="openLocalQualityUpgrade(true)">重新检测</button>`;
+  const actionsHTML = scanning
+    ? `<button type="button" class="ctrl-btn" onclick="cancelLocalUpgradeScan()">停止检测</button>${closeBtn}`
+    : `${rescanBtn}${closeBtn}<button type="button" class="ctrl-btn primary" onclick="startLocalUpgradeBatch()"${localUpgradeScanItems.length === 0 ? " disabled" : ""}>一键升级（${localUpgradeScanItems.length} 首）</button>`;
+
+  setLocalUpgradeContent(bodyHTML, actionsHTML);
+}
+
+async function cancelLocalUpgradeScan() {
+  try {
+    await localUpgradeRequest("/local_music/upgrade_scan/cancel", { method: "POST" });
+  } catch (_) {}
+}
+
+function localUpgradeItemOptions(item) {
+  if (Array.isArray(item.options) && item.options.length > 0) return item.options;
+  return item.option ? [item.option] : [];
+}
+
+function localUpgradeChosenOption(item) {
+  const selected = localUpgradeSelections.get(item.id);
+  if (selected) return selected;
+  return localUpgradeItemOptions(item)[0] || null;
+}
+
+function localUpgradePickContent(option) {
+  if (!option) return `<span class="local-upgrade-source">暂无可用音源</span>`;
+  return `<span class="local-quality-badge tier-${escapeHTML(option.tier || "unknown")}">${escapeHTML(option.quality || "-")}</span>
+          <span class="local-upgrade-source">${escapeHTML(option.source_label || option.source)} · ${escapeHTML(option.size_text || "-")}</span>
+          <i class="fa-solid fa-caret-down"></i>`;
+}
+
+function toggleLocalUpgradeOptions(pick) {
+  const picker = pick.closest(".local-upgrade-picker");
+  const panel = picker && picker.querySelector(".local-upgrade-options");
+  if (!panel) return;
+  const willOpen = panel.hidden;
+  document.querySelectorAll(".local-upgrade-options").forEach((el) => {
+    if (el !== panel) el.hidden = true;
+  });
+  document.querySelectorAll(".local-upgrade-pick.is-open").forEach((el) => el.classList.remove("is-open"));
+  panel.hidden = !willOpen;
+  pick.classList.toggle("is-open", willOpen);
+  if (willOpen) {
+    panel.classList.remove("is-up");
+    const list = pick.closest(".local-upgrade-list");
+    if (list) {
+      const panelRect = panel.getBoundingClientRect();
+      const listRect = list.getBoundingClientRect();
+      if (panelRect.bottom > listRect.bottom - 4) panel.classList.add("is-up");
+    }
+  }
+}
+
+function pickLocalUpgradeOption(optionBtn, index) {
+  const picker = optionBtn.closest(".local-upgrade-picker");
+  const row = optionBtn.closest(".local-upgrade-row");
+  if (!picker || !row) return;
+  const item = localUpgradeScanItems.find((candidate) => candidate.id === row.dataset.itemId);
+  const options = item ? localUpgradeItemOptions(item) : [];
+  const option = options[index];
+  if (!item || !option) return;
+
+  localUpgradeSelections.set(item.id, option);
+  const pick = picker.querySelector(".local-upgrade-pick");
+  if (pick) {
+    pick.innerHTML = localUpgradePickContent(option);
+    pick.classList.remove("is-open");
+  }
+  picker.querySelectorAll(".local-upgrade-option").forEach((el, i) => el.classList.toggle("is-selected", i === index));
+  const panel = picker.querySelector(".local-upgrade-options");
+  if (panel) panel.hidden = true;
+}
+
+document.addEventListener("click", (event) => {
+  if (event.target.closest(".local-upgrade-picker")) return;
+  document.querySelectorAll(".local-upgrade-options").forEach((el) => {
+    el.hidden = true;
+  });
+  document.querySelectorAll(".local-upgrade-pick.is-open").forEach((el) => el.classList.remove("is-open"));
+});
+
+async function startLocalUpgradeBatch() {
+  const items = localUpgradeScanItems
+    .map((item) => {
+      const option = localUpgradeChosenOption(item);
+      if (!option || !option.song) return null;
+      return { local_id: item.id, source: option.source, song: option.song };
+    })
+    .filter(Boolean);
+  if (items.length === 0) return;
+
+  const confirmed = window.confirm(
+    `将升级 ${items.length} 首歌曲，默认使用各平台中音质最高的版本（可逐首点开切换）。\n\n选中的音源会被下载并覆盖本地文件，原文件无法恢复，确定继续？`,
+  );
+  if (!confirmed) return;
+
+  localUpgradeBatchTotal = items.length;
+  setLocalUpgradeContent(
+    `<div class="local-upgrade-summary"><i class="fa-solid fa-spinner fa-spin"></i> 正在升级 0/${items.length}…</div>${localUpgradeProgressHTML(0, items.length)}`,
+    "",
+  );
+
+  try {
+    await localUpgradeRequest("/local_music/upgrade_batch", { method: "POST", body: { items } });
+    startLocalUpgradeBatchPolling();
+  } catch (err) {
+    setLocalUpgradeContent(
+      `<div class="local-upgrade-hint error">${escapeHTML(err.message)}</div>`,
+      `<button type="button" class="ctrl-btn" onclick="closeLocalUpgradeModal()">关闭</button>`,
+    );
+  }
+}
+
+function startLocalUpgradeBatchPolling() {
+  stopLocalUpgradePolling();
+  const tick = async () => {
+    try {
+      const data = await localUpgradeRequest("/local_music/upgrade_batch/status");
+      renderLocalUpgradeBatch(data);
+      if (data.running) {
+        localUpgradePollTimer = setTimeout(tick, 1200);
+        return;
+      }
+      localUpgradePollTimer = null;
+    } catch (_) {
+      localUpgradePollTimer = setTimeout(tick, 2000);
+    }
+  };
+  tick();
+}
+
+function renderLocalUpgradeBatch(data) {
+  const items = data.items || [];
+  const rows = items
+    .map((item) => {
+      let icon = '<i class="fa-regular fa-clock"></i>';
+      let detail = "等待中";
+      if (item.status === "ok") {
+        icon = '<i class="fa-solid fa-circle-check"></i>';
+        detail = `已升级${item.new_quality ? ` · ${item.new_quality}` : ""}`;
+        if (item.warning) detail += `（${item.warning}）`;
+      } else if (item.status === "failed") {
+        icon = '<i class="fa-solid fa-circle-xmark"></i>';
+        detail = item.error || "升级失败";
+      }
+      return `
+      <li class="local-upgrade-row is-${escapeHTML(item.status || "pending")}">
+        <div class="local-upgrade-main">
+          <div class="local-upgrade-song">
+            <strong>${escapeHTML(item.name || item.local_id || "")}</strong>
+            <span>${escapeHTML(item.artist || "")}${item.source_label ? ` · ${escapeHTML(item.source_label)}` : ""}</span>
+          </div>
+          <div class="local-upgrade-result">${icon}<span>${escapeHTML(detail)}</span></div>
+        </div>
+      </li>`;
+    })
+    .join("");
+
+  const summary = data.running
+    ? `<i class="fa-solid fa-spinner fa-spin"></i> 正在升级 ${data.done}/${data.total}，失败 ${data.failed} 首`
+    : `升级完成：成功 ${data.total - data.failed} 首，失败 ${data.failed} 首`;
+
+  let bodyHTML = `<div class="local-upgrade-summary">${summary}</div>`;
+  if (data.running) {
+    bodyHTML += localUpgradeProgressHTML(data.done, data.total);
+  }
+  bodyHTML += rows;
+
+  const actionsHTML = data.running
+    ? ""
+    : `<button type="button" class="ctrl-btn primary" onclick="finishLocalUpgradeBatch()">完成</button>`;
+
+  setLocalUpgradeContent(bodyHTML, actionsHTML);
+}
+
+function finishLocalUpgradeBatch() {
+  closeLocalUpgradeModal();
+  showToast("音质提升", "升级任务已结束，正在刷新列表…", "success");
+  refreshLocalMusicPageAfterMutation();
 }
 
 function ensureLocalMusicPaginationBar() {
@@ -6757,11 +7360,29 @@ try {
     preload: "metadata",
     volume: 0.7,
     listFolded: false,
+    listMaxHeight: "660px",
     lrcType: 3,
     audio: [],
   });
 } catch (error) {
   console.warn("[music-dl] APlayer 初始化失败，播放器功能不可用:", error);
+}
+
+if (ap) {
+  [
+    "listadd",
+    "listremove",
+    "listclear",
+    "listswitch",
+    "listshow",
+  ].forEach((eventName) => {
+    ap.on(eventName, () => {
+      window.setTimeout(refreshPlaybackQueueHeight, 0);
+    });
+  });
+  window.addEventListener("resize", () => {
+    window.requestAnimationFrame(refreshPlaybackQueueHeight);
+  });
 }
 
 window.ap = ap;
@@ -7807,11 +8428,13 @@ window.playAllAndJumpToId = function (songId) {
   }
 };
 
-let isBatchMode = false;
-let autoSwitchInvalidTimer = 0;
-let autoSwitchInvalidInProgress = false;
-let autoSwitchInvalidPending = false;
-let autoSwitchInvalidLastKey = "";
+// 这些状态在页面早期初始化（设置加载）阶段就可能被访问，
+// 因此使用 var 声明，避免 let/const 的暂时性死区导致启动即报错。
+var isBatchMode = false;
+var autoSwitchInvalidTimer = 0;
+var autoSwitchInvalidInProgress = false;
+var autoSwitchInvalidPending = false;
+var autoSwitchInvalidLastKey = "";
 
 function clearAutoSwitchInvalidTimer() {
   if (autoSwitchInvalidTimer) {
@@ -9360,6 +9983,31 @@ if (ap?.on) {
   else void restorePlaybackSession();
 }
 
+// 播放清单默认最多展开到 20 首：少于 20 首时随内容自动增高，超过后才出现滚动条。
+// 说明：这里不写成模块级常量，避免早期初始化调用本函数时命中 const 暂时性死区。
+function playbackQueueMaxVisibleRows() {
+  return window.matchMedia("(max-width: 768px)").matches ? 6 : 20;
+}
+
+function updatePlaybackQueueListHeight(ol, count) {
+  if (!ol) return;
+  const maxRows = playbackQueueMaxVisibleRows();
+  // 可见行数以内交给内容自然撑开，只有超出时才限制高度并出现滚动条。
+  if (!count || count <= maxRows) {
+    if (ol.style.maxHeight) ol.style.maxHeight = "";
+    return;
+  }
+  const rowHeight = ol.scrollHeight > 0 ? ol.scrollHeight / count : 33;
+  const maxHeight = `${Math.round((rowHeight || 33) * maxRows)}px`;
+  if (ol.style.maxHeight !== maxHeight) ol.style.maxHeight = maxHeight;
+}
+
+// 清单增删后 APlayer 不会重算外层高度，这里按当前实际行数刷新。
+function refreshPlaybackQueueHeight() {
+  const ol = document.querySelector(".aplayer.aplayer-fixed .aplayer-list ol");
+  if (ol) updatePlaybackQueueListHeight(ol, ol.children.length);
+}
+
 function syncPlaybackQueueControls(player) {
   const list = player.querySelector(".aplayer-list");
   const ol = list?.querySelector("ol");
@@ -9387,6 +10035,7 @@ function syncPlaybackQueueControls(player) {
   const label = toolbar.querySelector(".playback-queue-count");
   if (label.textContent !== `播放清单 · ${count} 首`) label.textContent = `播放清单 · ${count} 首`;
   toolbar.querySelector("button").disabled = !count;
+  updatePlaybackQueueListHeight(ol, ol.children.length);
   if (list.dataset.queueControlsCount === String(count) && (!count || ol.lastElementChild?.querySelector(".playback-remove-track"))) return;
   list.dataset.queueControlsCount = String(count);
   for (const row of ol.children) {

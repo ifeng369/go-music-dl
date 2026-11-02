@@ -1,0 +1,19 @@
+{
+    "port-config": {
+        "protocol-file": "musicdl.sc"
+    },
+    "data-share": {
+        "shares": [
+            {
+                "name": "musicdl",
+                "permission": {
+                    "rw": [
+                        "musicdl"
+                    ]
+                }
+            }
+        ]
+    },
+    "systemd-unit": {
+    }
+}

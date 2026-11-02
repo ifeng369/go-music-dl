@@ -55,6 +55,9 @@
             </button>
             {{ end }}
             {{ if eq .SearchType "local_music" }}
+            <button type="button" class="ctrl-btn local-quality-upgrade-trigger" title="扫描本地曲库，列出可提升音质的歌曲" onclick="openLocalQualityUpgrade()">
+                <i class="fa-solid fa-arrow-up-right-dots"></i> 音质提升
+            </button>
             <span class="local-music-upload-actions" aria-label="导入本地音乐">
                 <label class="ctrl-btn local-music-upload-button is-file" for="localMusicPageFileInput">
                     <i class="fa-solid fa-file-arrow-up"></i> 上传文件
@@ -256,6 +259,11 @@
                 </button>
 
                 {{ if $isLocalMusicPage }}
+                <button type="button" class="btn-circle btn-quality" title="音质替换"
+                        onclick="openLocalQualityMenu(this)">
+                    <i class="fa-solid fa-arrow-up-right-dots"></i>
+                </button>
+
                 <button type="button" class="btn-circle btn-fav" title="收藏到自制歌单"
                         onclick="openAddToCollectionModal(this)">
                     <i class="fa-regular fa-heart"></i>

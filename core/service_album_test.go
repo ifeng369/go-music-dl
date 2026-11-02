@@ -62,7 +62,7 @@ func TestPlaylistFactoriesAndSourceList(t *testing.T) {
 }
 
 func TestUserPlaylistFactoriesAndSourceList(t *testing.T) {
-	supported := []string{"netease", "qq", "kugou", "soda"}
+	supported := []string{"netease", "qq", "kugou", "kuwo", "soda"}
 	for _, source := range supported {
 		if fn := GetUserPlaylistsFunc(source); fn == nil {
 			t.Fatalf("GetUserPlaylistsFunc(%q) returned nil", source)

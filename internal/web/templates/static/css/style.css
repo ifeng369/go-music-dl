@@ -2573,7 +2573,100 @@ body.karaoke-lyrics-active .aplayer .aplayer-lrc p.aplayer-lrc-current {
 
 .aplayer .playback-queue-toolbar { position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 12px; background:#f8fafc; border-bottom:1px solid #e2e8f0; color:#64748b; font-size:12px; }
 .aplayer .playback-queue-clear { min-height:28px; padding:4px 9px; font-size:11px; }
-.aplayer .aplayer-list li { padding-right:44px; }
+/* 给右侧“移除”按钮留出空间，避免歌手名与按钮重叠（vendor 的同权重规则写在前面） */
+.aplayer.aplayer-fixed .aplayer-list ol li { padding-right:46px; }
+.aplayer.aplayer-fixed .aplayer-list ol li .aplayer-list-author { max-width:55%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .aplayer .playback-remove-track { position:absolute; right:8px; top:4px; display:inline-flex; align-items:center; justify-content:center; width:25px; height:25px; padding:0; border:1px solid transparent; border-radius:7px; background:transparent; color:#94a3b8; cursor:pointer; }
 .aplayer .playback-remove-track:hover { color:#be123c; background:#fff1f2; border-color:#fecdd3; }
 .aplayer .playback-remove-track:focus-visible, .aplayer .playback-queue-clear:focus-visible { outline:2px solid #059669; outline-offset:2px; }
+
+/* 本地音乐音质替换浮层 */
+.btn-quality { color:#047857; }
+.btn-quality:hover { background:#ecfdf5; color:#065f46; }
+.local-quality-popover {
+    position: fixed;
+    z-index: 1200;
+    box-sizing: border-box;
+    padding: 12px;
+    border: 1px solid #d9eee5;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.99);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.2);
+    animation: songToolsIn 0.16s ease-out;
+    max-height: min(70vh, 460px);
+    display: flex;
+    flex-direction: column;
+}
+.local-quality-header { display:flex; align-items:center; justify-content:space-between; gap:10px; padding-bottom:8px; }
+.local-quality-title { color:var(--text-main, #0f172a); font-size:13px; font-weight:800; }
+.local-quality-close { border:none; background:transparent; color:#94a3b8; font-size:18px; line-height:1; padding:0 2px; cursor:pointer; }
+.local-quality-close:hover { color:#0f172a; }
+.local-quality-body { overflow-y:auto; min-height:0; }
+.local-quality-loading, .local-quality-empty { display:flex; align-items:center; justify-content:center; gap:8px; padding:22px 10px; color:#64748b; font-size:12px; font-weight:700; text-align:center; }
+.local-quality-empty.is-error { color:#dc2626; }
+.local-quality-current { padding:2px 2px 10px; border-bottom:1px solid #eef5f1; }
+.local-quality-current-name { color:#0f172a; font-size:13px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.local-quality-current-meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.local-quality-tag { padding:2px 7px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:700; }
+.local-quality-tag.is-tier { background:#ecfdf5; color:#047857; }
+.local-quality-list { display:flex; flex-direction:column; gap:6px; padding-top:8px; }
+.local-quality-row { display:grid; grid-template-columns:minmax(0, 1fr) auto auto; align-items:center; gap:8px; width:100%; padding:9px 10px; border:1px solid #e6f2ec; border-radius:10px; background:#fbfefd; cursor:pointer; text-align:left; transition:border-color 0.15s ease, background-color 0.15s ease; }
+.local-quality-row:hover:not(:disabled) { border-color:#34d399; background:#ecfdf5; }
+.local-quality-row:disabled { opacity:.6; cursor:default; }
+.local-quality-source { color:#0f172a; font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.local-quality-badge { padding:2px 7px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:800; white-space:nowrap; }
+.local-quality-badge.tier-hires { background:#fef3c7; color:#b45309; }
+.local-quality-badge.tier-lossless { background:#dcfce7; color:#15803d; }
+.local-quality-badge.tier-high { background:#dbeafe; color:#1d4ed8; }
+.local-quality-size { color:#64748b; font-size:11px; font-weight:700; white-space:nowrap; }
+.local-quality-upgrade { grid-column:1 / -1; color:#047857; font-size:11px; font-weight:800; }
+
+/* 本地音乐一键音质提升 */
+.local-quality-upgrade-trigger { color:#047857; border-color:#b7e4d4; }
+.local-quality-upgrade-trigger:hover { background:#ecfdf5; border-color:#34d399; }
+.local-upgrade-modal { width:min(760px, 94vw); max-width:760px; }
+.local-upgrade-subtitle { margin:4px 0 0; color:#64748b; font-size:12px; }
+.local-upgrade-actions { display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:14px; padding-top:12px; border-top:1px solid #eef5f1; }
+.local-upgrade-actions .ctrl-btn:disabled { opacity:.55; cursor:not-allowed; }
+.local-upgrade-summary { color:#334155; font-size:13px; font-weight:700; }
+.local-upgrade-progress { height:6px; margin:10px 0 12px; border-radius:999px; background:#eef5f1; overflow:hidden; }
+.local-upgrade-progress-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#34d399,#10b981); transition:width .25s ease; }
+.local-upgrade-hint { display:flex; align-items:center; gap:8px; padding:18px 4px; color:#64748b; font-size:13px; }
+.local-upgrade-hint.error { color:#dc2626; }
+.local-upgrade-list { display:flex; flex-direction:column; gap:8px; margin:12px 0 0; padding:0; list-style:none; max-height:46vh; overflow-y:auto; }
+.local-upgrade-row { padding:10px 12px; border:1px solid #e6f2ec; border-radius:12px; background:#fbfefd; }
+.local-upgrade-main { display:flex; align-items:center; gap:10px; }
+.local-upgrade-song { display:flex; flex-direction:column; min-width:0; flex:1 1 auto; }
+.local-upgrade-song strong { color:#0f172a; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.local-upgrade-song span { color:#64748b; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.local-upgrade-current { color:#64748b; font-size:11px; font-weight:700; white-space:nowrap; }
+.local-upgrade-arrow { color:#cbd5e1; font-size:11px; }
+.local-upgrade-picker { position:relative; flex:0 0 auto; }
+.local-upgrade-pick { display:flex; align-items:center; gap:6px; padding:5px 8px; border:1px solid #e2efe9; border-radius:10px; background:#fff; font:inherit; cursor:default; }
+.local-upgrade-pick.has-options { cursor:pointer; }
+.local-upgrade-pick.has-options:hover { border-color:#34d399; background:#ecfdf5; }
+.local-upgrade-pick.has-options.is-open { border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.14); }
+.local-upgrade-pick .fa-caret-down { color:#94a3b8; font-size:10px; }
+.local-upgrade-pick:not(.has-options) .fa-caret-down { display:none; }
+.local-upgrade-pick { padding:4px 7px; gap:5px; }
+.local-upgrade-pick .local-quality-badge { padding:1px 6px; font-size:10px; }
+.local-upgrade-pick .local-upgrade-source { font-size:10.5px; }
+.local-upgrade-options { position:absolute; right:0; top:calc(100% + 6px); z-index:20; display:flex; flex-direction:column; gap:4px; min-width:280px; padding:6px; border:1px solid #d9eee5; border-radius:12px; background:#fff; box-shadow:0 16px 40px rgba(15,23,42,.18); }
+.local-upgrade-options[hidden] { display:none; }
+.local-upgrade-options.is-up { top:auto; bottom:calc(100% + 6px); }
+.local-upgrade-option { display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:8px; padding:8px 10px; border:1px solid transparent; border-radius:9px; background:transparent; font:inherit; text-align:left; cursor:pointer; }
+.local-upgrade-option:hover { background:#f1fbf6; }
+.local-upgrade-option.is-selected { border-color:#34d399; background:#ecfdf5; }
+.local-upgrade-option-source { color:#0f172a; font-size:12px; font-weight:700; white-space:nowrap; }
+.local-upgrade-option-size { color:#64748b; font-size:11px; font-weight:700; white-space:nowrap; }
+.local-upgrade-option-tag { color:#b45309; font-size:10px; font-weight:700; }
+.local-upgrade-source { color:#0f766e; font-weight:700; }
+.local-upgrade-result { display:flex; align-items:center; gap:6px; color:#64748b; font-size:12px; text-align:right; }
+.local-upgrade-row.is-ok .local-upgrade-result { color:#15803d; }
+.local-upgrade-row.is-failed .local-upgrade-result { color:#dc2626; }
+@media (max-width: 640px) {
+  .local-upgrade-main { flex-wrap:wrap; }
+  .local-upgrade-song { flex:1 1 100%; }
+  .local-upgrade-options { right:auto; left:0; min-width:min(320px, 82vw); }
+  .local-upgrade-result { justify-content:flex-start; text-align:left; }
+}

@@ -1,0 +1,7 @@
+# Shell 脚本统一使用 LF，否则 Windows 检出后 Docker 入口脚本的 shebang 会失效
+*.sh text eol=lf
+# fnOS 安装包内的脚本没有扩展名，也必须保持 LF
+fnos/cmd/* text eol=lf
+fnos/wizard/* text eol=lf
+fnos/*.sc text eol=lf
+fnos/manifest text eol=lf
