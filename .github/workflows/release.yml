@@ -169,13 +169,42 @@ jobs:
         shell: powershell
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'musicdl-release-2026' }}
         run: |
-          [IO.File]::WriteAllBytes("release.keystore", [Convert]::FromBase64String($env:ANDROID_KEYSTORE_BASE64))
+          $b64 = $env:ANDROID_KEYSTORE_BASE64
+          if ([string]::IsNullOrWhiteSpace($b64)) {
+            $fallback = ".github/android/release.keystore.b64"
+            if (-not (Test-Path $fallback)) {
+              throw "缺少仓库 Secret ANDROID_KEYSTORE_BASE64，且仓库内置签名密钥 $fallback 不存在。"
+            }
+            $b64 = Get-Content -Path $fallback -Raw
+            Write-Host "::warning::未配置 ANDROID_KEYSTORE_BASE64，使用仓库内置的签名密钥。该密钥同时存在于仓库中，仅适合个人/内部分发。"
+          }
+
+          $bytes = [Convert]::FromBase64String(($b64 -replace '\s', ''))
+          if ($bytes.Length -lt 32) {
+            throw "签名密钥内容不正确：Base64 解码后只有 $($bytes.Length) 字节。请检查 ANDROID_KEYSTORE_BASE64 是否为 release.keystore 文件的 Base64。"
+          }
+          [IO.File]::WriteAllBytes("release.keystore", $bytes)
+          $magic = ($bytes[0..3] | ForEach-Object { $_.ToString('X2') }) -join ' '
+          Write-Host "release.keystore: size=$($bytes.Length) magic=$magic"
+          if ($bytes[0] -ne 0x30) {
+            throw "release.keystore 不是有效的 PKCS12/DER 文件（magic=$magic），无法用于签名。"
+          }
+          if ([string]::IsNullOrEmpty($env:ANDROID_KEYSTORE_PASSWORD)) {
+            throw "缺少仓库 Secret ANDROID_KEYSTORE_PASSWORD（签名密钥的密码）。"
+          }
+          $output = & keytool -list -keystore release.keystore -storepass $env:ANDROID_KEYSTORE_PASSWORD 2>&1
+          $code = $LASTEXITCODE
+          $output | Select-Object -Last 8 | ForEach-Object { Write-Host $_ }
+          if ($code -ne 0) {
+            throw "keytool 无法读取 release.keystore：请确认 ANDROID_KEYSTORE_PASSWORD 正确，且 keystore 格式（PKCS12/JKS）与当前 JDK 兼容。"
+          }
 
       - name: Build APK
         shell: cmd
         env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'musicdl-release-2026' }}
           ANDROID_KEYSTORE_FILE: ..\release.keystore
           MUSIC_DL_BUNDLE_ANDROID_FFMPEG: "1"
         run: |

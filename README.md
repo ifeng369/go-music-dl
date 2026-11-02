@@ -228,6 +228,14 @@ adb install -r music-dl.apk
 
 发布后可在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 下载三个 APK，推荐优先使用 `music-dl_arm64-v8a.apk`；极个别设备若无法安装/运行，再下载 `music-dl.apk`（无分片兼容包）。
 
+关于签名密钥：工作流优先使用仓库 Secret `ANDROID_KEYSTORE_BASE64`（`release.keystore` 的 Base64）与 `ANDROID_KEYSTORE_PASSWORD`；两者未配置时会回退到仓库内置的 `.github/android/release.keystore.b64`（密码见工作流中的默认值）。内置密钥方便开箱即用，但私钥随仓库公开，**只适合个人或内部分发**；正式分发建议替换为自建 keystore 并通过 Secrets 注入，同时保证后续版本使用同一签名以便覆盖升级。
+
+自建 keystore 的 Base64 生成方式（Windows PowerShell）：
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('release.keystore')) | Set-Clipboard
+```
+
 #### 3. Java 17 与 Build-Tools 版本说明（重点）
 
 高版本（`34.0.0` 及以上）的 Android Build-Tools 已修复旧版 `d8.bat` 脚本兼容性问题，可正常配合 Java 17 使用。
