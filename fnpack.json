@@ -1,0 +1,32 @@
+{
+  "schema_version": "2",
+  "source_info": {
+    "name": "go-music-dl",
+    "author": "ifeng369",
+    "description": "Music-DL 的飞牛 fnOS 应用源，提供 x86 / arm 安装包。",
+    "homepage": "https://github.com/ifeng369/go-music-dl"
+  },
+  "apps": {
+    "musicdl": {
+      "display_name": "Music-DL",
+      "desc": "Music-DL 是一个多平台音乐工具：支持网易云、QQ、酷狗、酷我、咪咕等平台的搜索与下载，并提供 Web 界面、本地曲库管理、音质替换、一键音质提升和收藏歌单。",
+      "platform": [
+        "x86",
+        "arm"
+      ],
+      "categories": [
+        "影音娱乐"
+      ],
+      "icon_url": "https://raw.githubusercontent.com/ifeng369/go-music-dl/main/desktop/icon.png",
+      "readme_url": "https://raw.githubusercontent.com/ifeng369/go-music-dl/main/README.md",
+      "bug_report_url": "https://github.com/ifeng369/go-music-dl/issues",
+      "maintainer": "ifeng369",
+      "maintainer_url": "https://github.com/ifeng369",
+      "run_as": "package",
+      "install_type": "",
+      "is_docker": false,
+      "service_port": "18081",
+      "releases": {}
+    }
+  }
+}

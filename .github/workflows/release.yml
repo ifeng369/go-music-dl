@@ -169,7 +169,7 @@ jobs:
         shell: powershell
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'musicdl-release-2026' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           $ErrorActionPreference = "Stop"
           function Fail($message) {
@@ -177,56 +177,76 @@ jobs:
             exit 1
           }
 
-          $b64 = $env:ANDROID_KEYSTORE_BASE64
-          if ([string]::IsNullOrWhiteSpace($b64)) {
-            $fallback = ".github/android/release.keystore.b64"
-            if (-not (Test-Path $fallback)) {
-              Fail "缺少仓库 Secret ANDROID_KEYSTORE_BASE64，且仓库内置签名密钥 $fallback 不存在。"
+          # Keep this step ASCII-only: non-ASCII text in a PowerShell step can be
+          # mis-decoded when the runner script file has no UTF-8 BOM, which breaks parsing.
+          function Convert-Keystore($b64, $pass) {
+            try {
+              $bytes = [Convert]::FromBase64String(($b64 -replace '\s', ''))
+            } catch {
+              Write-Host "  base64 decode failed: $($_.Exception.Message)"
+              return $null
             }
-            $b64 = Get-Content -Path $fallback -Raw
-            Write-Host "::warning::未配置 ANDROID_KEYSTORE_BASE64，使用仓库内置的签名密钥。该密钥同时存在于仓库中，仅适合个人/内部分发。"
-            Write-Host "keystore source: repository fallback ($fallback)"
+            if ($bytes.Length -lt 32) {
+              Write-Host "  decoded only $($bytes.Length) bytes"
+              return $null
+            }
+            $magic = ($bytes[0..1] | ForEach-Object { $_.ToString('X2') }) -join ' '
+            if ($bytes[0] -ne 0x30) {
+              Write-Host "  not a PKCS12/DER file (magic=$magic)"
+              return $null
+            }
+            [IO.File]::WriteAllBytes("release.keystore", $bytes)
+            Write-Host "  release.keystore size=$($bytes.Length) magic=$magic"
+            if (Get-Command keytool -ErrorAction SilentlyContinue) {
+              $keytoolOutput = & keytool -list -keystore release.keystore -storepass $pass 2>&1
+              if ($LASTEXITCODE -ne 0) {
+                ($keytoolOutput | Out-String) -split "`r?`n" | Where-Object { $_ -ne "" } | Select-Object -First 4 | ForEach-Object { Write-Host "  $_" }
+                Write-Host "  keytool cannot read this keystore (wrong password or unsupported format)"
+                return $null
+              }
+            }
+            return $bytes
+          }
+
+          $storePass = $env:ANDROID_KEYSTORE_PASSWORD
+          if ([string]::IsNullOrWhiteSpace($storePass)) {
+            $storePass = "musicdl-release-2026"
+          }
+
+          $bytes = $null
+          if ([string]::IsNullOrWhiteSpace($env:ANDROID_KEYSTORE_BASE64)) {
+            Write-Host "keystore source: bundled .github/android/release.keystore.b64"
           } else {
-            Write-Host "keystore source: repository secret (base64 length=$($b64.Length))"
+            Write-Host "keystore source: repository secret ANDROID_KEYSTORE_BASE64"
+            $bytes = Convert-Keystore $env:ANDROID_KEYSTORE_BASE64 $storePass
+            if ($bytes) {
+              Write-Host "using keystore from secret"
+            } else {
+              Write-Host "::warning::secret keystore is unusable, falling back to the bundled keystore"
+              $storePass = "musicdl-release-2026"
+            }
           }
 
-          try {
-            $bytes = [Convert]::FromBase64String(($b64 -replace '\s', ''))
-          } catch {
-            Fail "ANDROID_KEYSTORE_BASE64 不是合法的 Base64（长度 $($b64.Length)）：$($_.Exception.Message)"
+          if (-not $bytes) {
+            $fallbackPath = ".github/android/release.keystore.b64"
+            if (-not (Test-Path $fallbackPath)) {
+              Fail "No usable Android signing keystore: secret is empty or invalid and the bundled keystore is missing."
+            }
+            $storePass = "musicdl-release-2026"
+            $bytes = Convert-Keystore (Get-Content $fallbackPath -Raw) $storePass
           }
-          if ($bytes.Length -lt 32) {
-            Fail "签名密钥内容不正确：Base64 解码后只有 $($bytes.Length) 字节。请检查 ANDROID_KEYSTORE_BASE64 是否为 release.keystore 文件的 Base64。"
-          }
-          [IO.File]::WriteAllBytes("release.keystore", $bytes)
-          $magic = ($bytes[0..3] | ForEach-Object { $_.ToString('X2') }) -join ' '
-          Write-Host "release.keystore: size=$($bytes.Length) magic=$magic"
-          if ($bytes[0] -ne 0x30) {
-            Fail "release.keystore 不是有效的 PKCS12/DER 文件（magic=$magic），无法用于签名。"
+          if (-not $bytes) {
+            Fail "Android signing keystore is unusable: even the bundled keystore cannot be read by keytool."
           }
 
-          $pwd = $env:ANDROID_KEYSTORE_PASSWORD
-          if ([string]::IsNullOrEmpty($pwd)) {
-            Fail "缺少仓库 Secret ANDROID_KEYSTORE_PASSWORD（签名密钥的密码）。"
-          }
-          Write-Host "keystore password: 已配置（长度 $($pwd.Length)）"
-
-          if (-not (Get-Command keytool -ErrorAction SilentlyContinue)) {
-            Write-Host "::warning::当前环境找不到 keytool，跳过 keystore 读取校验。"
-            exit 0
-          }
-          $output = & keytool -list -keystore release.keystore -storepass $pwd 2>&1
-          $code = $LASTEXITCODE
-          ($output | Out-String) -split "`r?`n" | Where-Object { $_ -ne "" } | Select-Object -Last 8 | ForEach-Object { Write-Host $_ }
-          if ($code -ne 0) {
-            Fail "keytool 无法读取 release.keystore（exit=$code）：请确认 ANDROID_KEYSTORE_PASSWORD 与密钥匹配，且格式（PKCS12/JKS）与当前 JDK 兼容。"
-          }
+          # Export the effective password for the later build steps.
+          Add-Content -Path $env:GITHUB_ENV -Value "ANDROID_KEYSTORE_PASSWORD=$storePass" -Encoding ascii
+          Add-Content -Path $env:GITHUB_ENV -Value "ANDROID_KEYSTORE_FILE=..\release.keystore" -Encoding ascii
+          Write-Host "keystore ready: size=$($bytes.Length) password length=$($storePass.Length)"
 
       - name: Build APK
         shell: cmd
         env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'musicdl-release-2026' }}
-          ANDROID_KEYSTORE_FILE: ..\release.keystore
           MUSIC_DL_BUNDLE_ANDROID_FFMPEG: "1"
         run: |
           package_app.bat
@@ -303,3 +323,42 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+      - name: Checkout main for fnpack.json
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: fnpack-repo
+
+      - name: Update FnDepot source
+        shell: bash
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 scripts/update_fnpack.py \
+            --repo fnpack-repo \
+            --dist dist \
+            --version "${{ needs.resolve-version.outputs.version }}" \
+            --tag "${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', needs.resolve-version.outputs.version) }}"
+
+      - name: Commit fnpack.json
+        shell: bash
+        working-directory: fnpack-repo
+        run: |
+          if git diff --quiet -- fnpack.json; then
+            echo "fnpack.json 无变化，跳过提交"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add fnpack.json
+          git commit -m "chore(fnpack): 发布 v${{ needs.resolve-version.outputs.version }}"
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "推送失败，第 ${attempt} 次重试前先同步远端 main"
+            git pull --rebase origin main
+          done
+          echo "::error::无法把 fnpack.json 推送到 main"
+          exit 1

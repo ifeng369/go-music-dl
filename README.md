@@ -61,6 +61,22 @@ pwsh -NoProfile -File .\build-fpk.ps1 -Arch arm
 
 推送 `v*` 形式的 tag（如 `v1.2.0`）会触发 GitHub Actions（`.github/workflows/release.yml`），自动编译 x86 / arm 两套 FPK 与 Android APK，并把它们连同 `SHA256SUMS.txt` 一起发布到 Releases。
 
+### FnDepot 应用源
+
+仓库根目录的 [`fnpack.json`](./fnpack.json) 就是 FnDepot（v2 规范）的外部应用源配置。在飞牛 fnOS 的 FnDepot 里添加源时填写：
+
+```
+https://github.com/ifeng369/go-music-dl
+```
+
+FnDepot 会读取默认分支上的 `fnpack.json`，从中拿到应用信息、图标和最新版本的安装包地址 / 大小 / SHA256。发布新版本时，`release` 工作流会在上传 Release 资产后用 [`scripts/update_fnpack.py`](./scripts/update_fnpack.py) 自动把该版本的 x86 / arm 包写入 `fnpack.json` 并提交到 `main`，无需手动维护版本号或校验值。
+
+本地也可以手动更新（例如离线构建之后）：
+
+```bash
+python3 scripts/update_fnpack.py --repo . --dist dist --version 1.2.1 --tag v1.2.1
+```
+
 ---
 
 ![Web UI 1](./screenshots/web1.png)
