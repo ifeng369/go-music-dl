@@ -332,12 +332,13 @@ jobs:
 
       - name: Update FnDepot source
         shell: bash
+        working-directory: fnpack-repo
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python3 scripts/update_fnpack.py \
-            --repo fnpack-repo \
-            --dist dist \
+            --repo . \
+            --dist ../dist \
             --version "${{ needs.resolve-version.outputs.version }}" \
             --tag "${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', needs.resolve-version.outputs.version) }}"
 
