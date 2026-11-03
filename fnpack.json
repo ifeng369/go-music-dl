@@ -29,18 +29,18 @@
       "releases": {
         "1.2.1": {
           "changelog": "常规更新与稳定性改进。",
-          "updated_at": "2026-11-02T23:36:07+00:00",
+          "updated_at": "2026-11-03T00:10:24+00:00",
           "os_min_version": "1.1.8",
           "packages": {
             "x86": {
               "download_url": "https://github.com/ifeng369/go-music-dl/releases/download/v1.2.1/musicdl_1.2.1_x86.fpk",
-              "sha256": "629f664f7dc36498590cb29142b3e6632a433b824822625dd872fe133dcc38cb",
-              "size": 15373664
+              "sha256": "9ca264ec082ec85c77f6df2764e3cf9bc3963794ba68dc34a00359470c4c5895",
+              "size": 15374525
             },
             "arm": {
               "download_url": "https://github.com/ifeng369/go-music-dl/releases/download/v1.2.1/musicdl_1.2.1_arm.fpk",
-              "sha256": "b75af67e9481e73ad47719a79ea4428f755db3081e2d1151dc4cf5dad5aff303",
-              "size": 14251716
+              "sha256": "11e9c998fc633d897c9be00168cee61557ef97ffeb23a991fd1d57bb8a914e89",
+              "size": 14251878
             }
           }
         }
