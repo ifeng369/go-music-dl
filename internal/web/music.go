@@ -315,15 +315,6 @@ func loadPlaylistSourceTabs(sources []string, fetcher func(string) ([]model.Play
 		if !ok {
 			continue
 		}
-		// 歌单数量多的排前面（我收藏的歌单按曲目数倒序展示）。
-		if len(res.playlists) > 1 {
-			sort.SliceStable(res.playlists, func(i, j int) bool {
-				if res.playlists[i].TrackCount != res.playlists[j].TrackCount {
-					return res.playlists[i].TrackCount > res.playlists[j].TrackCount
-				}
-				return res.playlists[i].Name < res.playlists[j].Name
-			})
-		}
 		tab := playlistSourceTab{
 			Source:    src,
 			Name:      core.GetSourceDescription(src),
@@ -334,7 +325,13 @@ func loadPlaylistSourceTabs(sources []string, fetcher func(string) ([]model.Play
 			tab.Error = res.err.Error()
 			failed = append(failed, tab.Name)
 		}
-		tabs = append(tabs, tab)	}
+		tabs = append(tabs, tab)
+	}
+
+	// 标签页同样按歌单数量倒序，数量多的来源排在前面（数量相同保持来源原有顺序）。
+	sort.SliceStable(tabs, func(i, j int) bool {
+		return tabs[i].Count > tabs[j].Count
+	})
 
 	errMsg := ""
 	if len(failed) > 0 && len(failed) == len(tabs) {
