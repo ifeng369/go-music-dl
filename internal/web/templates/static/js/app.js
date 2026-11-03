@@ -7377,18 +7377,14 @@ if (ap) {
     "listshow",
   ].forEach((eventName) => {
     ap.on(eventName, () => {
-      // APlayer 处理完事件后会按固定行高把列表滚到当前曲目，这里先同步记住用户的位置。
-      if (eventName === "listshow" || eventName === "listswitch") capturePlaybackQueueScroll();
-      window.setTimeout(() => {
-        refreshPlaybackQueueHeight();
-        // APlayer 展开列表时会按固定行高把当前曲目滚到视野里，这里还原用户原来的位置。
-        if (eventName === "listshow" || eventName === "listswitch") restorePlaybackQueueScroll();
-      }, 0);
+      window.setTimeout(refreshPlaybackQueueHeight, 0);
     });
   });
   window.addEventListener("resize", () => {
     window.requestAnimationFrame(refreshPlaybackQueueHeight);
   });
+  // 尽早接管滚动写入，避免第一次切歌时 APlayer 已经先动过列表。
+  refreshPlaybackQueueHeight();
 }
 
 window.ap = ap;
@@ -10010,74 +10006,28 @@ function updatePlaybackQueueListHeight(ol, count) {
 function refreshPlaybackQueueHeight() {
   const ol = document.querySelector(".aplayer.aplayer-fixed .aplayer-list ol");
   if (!ol) return;
-  if (!ol.dataset.scrollTracked) {
-    ol.dataset.scrollTracked = "1";
-    const markUserScroll = () => {
-      playbackQueueUserScrollUntil = Date.now() + 200;
-      // 用户主动滚动时取消尚未执行的还原，避免把用户的新位置再拉回去。
-      playbackQueueRestoreToken += 1;
-    };
-    ol.addEventListener("wheel", markUserScroll, { passive: true });
-    ol.addEventListener("touchstart", markUserScroll, { passive: true });
-    ol.addEventListener("touchmove", markUserScroll, { passive: true });
-    // 只有点在滚动条上才算用户滚动；点在歌曲行上随后会切歌，不能当作手动滚动。
-    ol.addEventListener(
-      "pointerdown",
-      (event) => {
-        if (event.offsetX <= ol.clientWidth) return;
-        playbackQueueUserScrollUntil = Infinity;
-        const endDrag = () => {
-          playbackQueueUserScrollUntil = Date.now() + 200;
-          document.removeEventListener("pointerup", endDrag);
-          document.removeEventListener("pointercancel", endDrag);
-        };
-        document.addEventListener("pointerup", endDrag);
-        document.addEventListener("pointercancel", endDrag);
-      },
-      { passive: true },
-    );
-    ol.addEventListener(
-      "scroll",
-      () => {
-        if (Date.now() < playbackQueueUserScrollUntil) playbackQueueScrollTop = ol.scrollTop;
-      },
-      { passive: true },
-    );
-  }
+  lockPlaybackQueueScroll(ol);
   updatePlaybackQueueListHeight(ol, ol.children.length);
 }
 
-// APlayer 展开列表或切歌时会用固定 33px 行高估算 scrollTop（33 * index）并强制滚动到当前曲目，
-// 实际行高常带小数，歌曲越多偏差越大。这里记录用户自己的滚动位置，事件结束后原样还原，
-// 保证点击歌曲、展开/收起列表时清单位置都不跳动。
-var playbackQueueScrollTop = 0;
-var playbackQueuePendingScrollTop = -1;
-var playbackQueueUserScrollUntil = 0;
-var playbackQueueRestoreToken = 0;
-
-function capturePlaybackQueueScroll() {
-  const ol = document.querySelector(".aplayer.aplayer-fixed .aplayer-list ol");
-  // 列表处于折叠态（clientHeight 为 0）时读不到有效位置，保留上一次已知值。
-  if (!ol || ol.clientHeight === 0) return;
-  playbackQueuePendingScrollTop = ol.scrollTop;
-}
-
-function restorePlaybackQueueScroll() {
-  const ol = document.querySelector(".aplayer.aplayer-fixed .aplayer-list ol");
-  if (!ol) return;
-  const target = playbackQueuePendingScrollTop >= 0 ? playbackQueuePendingScrollTop : playbackQueueScrollTop;
-  playbackQueuePendingScrollTop = -1;
-  // APlayer 切换/展开时会在约 500ms 内用动画反复写 scrollTop，
-  // 只还原一次会被覆盖，这里在动画期间多点回写，直到动画结束。
-  const token = (playbackQueueRestoreToken += 1);
-  const apply = () => {
-    if (token !== playbackQueueRestoreToken) return;
-    const maxScroll = Math.max(0, ol.scrollHeight - ol.clientHeight);
-    const next = Math.max(0, Math.min(target, maxScroll));
-    if (Math.abs(ol.scrollTop - next) > 1) ol.scrollTop = next;
-  };
-  apply();
-  [120, 320, 650].forEach((delay) => window.setTimeout(apply, delay));
+// APlayer 展开列表和切歌时都会用固定 33px 行高估算位置，并通过 500ms 动画改写 listOl.scrollTop
+// （show() 直接赋值、switch() 走动画），行高带小数时会先把清单一拽，之后才被还原，看起来就是「先跳一下再回来」。
+// 这里直接接管该元素的 scrollTop 写入：脚本写入一律忽略，用户滚轮、触摸与拖动滚动条都不受影响。
+function lockPlaybackQueueScroll(ol) {
+  if (!ol || ol.dataset.scrollLocked) return;
+  const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, "scrollTop");
+  if (!descriptor) return;
+  Object.defineProperty(ol, "scrollTop", {
+    configurable: true,
+    enumerable: descriptor.enumerable,
+    get() {
+      return descriptor.get.call(ol);
+    },
+    set() {
+      // 故意空实现：清单位置只由用户手动滚动决定。
+    },
+  });
+  ol.dataset.scrollLocked = "1";
 }
 
 function syncPlaybackQueueControls(player) {
