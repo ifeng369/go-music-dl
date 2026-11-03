@@ -324,36 +324,36 @@ jobs:
           fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref_name, '-') }}
 
-      - name: Checkout main for fnpack.json
+      - name: Checkout main for moo.json
         uses: actions/checkout@v4
         with:
           ref: main
-          path: fnpack-repo
+          path: moo-repo
 
-      - name: Update FnDepot source
+      - name: Update Moo source
         shell: bash
-        working-directory: fnpack-repo
+        working-directory: moo-repo
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          python3 scripts/update_fnpack.py \
+          python3 scripts/update_moo_json.py \
             --repo . \
             --dist ../dist \
             --version "${{ needs.resolve-version.outputs.version }}" \
             --tag "${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', needs.resolve-version.outputs.version) }}"
 
-      - name: Commit fnpack.json
+      - name: Commit moo.json
         shell: bash
-        working-directory: fnpack-repo
+        working-directory: moo-repo
         run: |
-          if git diff --quiet -- fnpack.json; then
-            echo "fnpack.json 无变化，跳过提交"
+          if git diff --quiet -- moo.json; then
+            echo "moo.json 无变化，跳过提交"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add fnpack.json
-          git commit -m "chore(fnpack): 发布 v${{ needs.resolve-version.outputs.version }}"
+          git add moo.json
+          git commit -m "chore(moo): 发布 v${{ needs.resolve-version.outputs.version }}"
           for attempt in 1 2 3; do
             if git push origin HEAD:main; then
               exit 0
@@ -361,5 +361,5 @@ jobs:
             echo "推送失败，第 ${attempt} 次重试前先同步远端 main"
             git pull --rebase origin main
           done
-          echo "::error::无法把 fnpack.json 推送到 main"
+          echo "::error::无法把 moo.json 推送到 main"
           exit 1

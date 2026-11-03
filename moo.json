@@ -1,15 +1,17 @@
 {
-  "schema_version": "2",
+  "schema_version": "moo",
   "source_info": {
     "name": "go-music-dl",
     "author": "ifeng369",
+    "distributor": "ifeng369",
+    "homepage": "https://github.com/ifeng369/go-music-dl",
     "description": "Music-DL 的飞牛 fnOS 应用源，提供 x86 / arm 安装包。",
-    "homepage": "https://github.com/ifeng369/go-music-dl"
+    "updated_at": "2026-11-03T09:45:00+08:00"
   },
   "apps": {
     "musicdl": {
       "display_name": "Music-DL",
-      "desc": "Music-DL 是一个多平台音乐工具：支持网易云、QQ、酷狗、酷我、咪咕等平台的搜索与下载，并提供 Web 界面、本地曲库管理、音质替换、一键音质提升和收藏歌单。",
+      "app_type": "fpk",
       "platform": [
         "x86",
         "arm"
@@ -17,64 +19,70 @@
       "categories": [
         "影音娱乐"
       ],
+      "desc": "Music-DL 是一个多平台音乐工具：支持网易云、QQ、酷狗、酷我、咪咕等平台的搜索与下载，并提供 Web 界面、本地曲库管理、音质替换、一键音质提升和收藏歌单。",
+      "author": "guohuiyuan",
+      "author_url": "https://github.com/guohuiyuan/go-music-dl",
+      "distributor": "ifeng369",
+      "homepage": "https://github.com/ifeng369/go-music-dl",
+      "bug_report_url": "https://github.com/ifeng369/go-music-dl/issues",
+      "license": "AGPL-3.0",
       "icon_url": "https://raw.githubusercontent.com/ifeng369/go-music-dl/main/desktop/icon.png",
       "readme_url": "https://raw.githubusercontent.com/ifeng369/go-music-dl/main/README.md",
-      "bug_report_url": "https://github.com/ifeng369/go-music-dl/issues",
-      "maintainer": "ifeng369",
-      "maintainer_url": "https://github.com/ifeng369",
-      "run_as": "package",
-      "install_type": "",
-      "is_docker": false,
-      "service_port": "18081",
+      "install_type": "package",
+      "service_port": 18081,
+      "min_fnos": "1.1.8",
       "releases": {
         "1.2.3": {
-          "changelog": "常规更新与稳定性改进。",
-          "updated_at": "2026-11-03T01:39:40+00:00",
-          "os_min_version": "1.1.8",
+          "changelog": "修复播放清单切歌、展开时列表位置跳动的问题：接管 APlayer 对播放列表滚动位置的写入，列表不再先跳到顶部再回弹，手动滚动也不受影响。",
+          "updated_at": "2026-11-03T01:39:38+00:00",
           "packages": {
             "x86": {
               "download_url": "https://github.com/ifeng369/go-music-dl/releases/download/v1.2.3/musicdl_1.2.3_x86.fpk",
               "sha256": "88d8c9a09d371db6d9b53b365ac796adbd87ea09cdb1e3d04b399adf8b0f7315",
-              "size": 15375635
+              "size": 15375635,
+              "size_mb": 14.66
             },
             "arm": {
               "download_url": "https://github.com/ifeng369/go-music-dl/releases/download/v1.2.3/musicdl_1.2.3_arm.fpk",
               "sha256": "0fb6ff6a70d0e2d1e089a89003867deeb70e89bac81071f10cf8034cf4b7ee1d",
-              "size": 14251800
+              "size": 14251800,
+              "size_mb": 13.59
             }
           }
         },
         "1.2.2": {
-          "changelog": "常规更新与稳定性改进。",
+          "changelog": "歌单标签按歌单数量排序，卡片保持原始顺序；播放清单展开、切歌时保持滚动位置。",
           "updated_at": "2026-11-03T01:04:13+00:00",
-          "os_min_version": "1.1.8",
           "packages": {
             "x86": {
               "download_url": "https://github.com/ifeng369/go-music-dl/releases/download/v1.2.2/musicdl_1.2.2_x86.fpk",
               "sha256": "0e44286e3fc9b2209c301900b2a9696d4ede71185a0634f1e9710b28358f247d",
-              "size": 15378598
+              "size": 15378598,
+              "size_mb": 14.67
             },
             "arm": {
               "download_url": "https://github.com/ifeng369/go-music-dl/releases/download/v1.2.2/musicdl_1.2.2_arm.fpk",
               "sha256": "87e161cc7fe62bff79cebce22feac2e512c583c12cad6282b727cec956acec8e",
-              "size": 14253244
+              "size": 14253244,
+              "size_mb": 13.59
             }
           }
         },
         "1.2.1": {
           "changelog": "常规更新与稳定性改进。",
           "updated_at": "2026-11-03T00:10:24+00:00",
-          "os_min_version": "1.1.8",
           "packages": {
             "x86": {
               "download_url": "https://github.com/ifeng369/go-music-dl/releases/download/v1.2.1/musicdl_1.2.1_x86.fpk",
               "sha256": "9ca264ec082ec85c77f6df2764e3cf9bc3963794ba68dc34a00359470c4c5895",
-              "size": 15374525
+              "size": 15374525,
+              "size_mb": 14.66
             },
             "arm": {
               "download_url": "https://github.com/ifeng369/go-music-dl/releases/download/v1.2.1/musicdl_1.2.1_arm.fpk",
               "sha256": "11e9c998fc633d897c9be00168cee61557ef97ffeb23a991fd1d57bb8a914e89",
-              "size": 14251878
+              "size": 14251878,
+              "size_mb": 13.59
             }
           }
         }

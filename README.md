@@ -61,21 +61,29 @@ pwsh -NoProfile -File .\build-fpk.ps1 -Arch arm
 
 推送 `v*` 形式的 tag（如 `v1.2.0`）会触发 GitHub Actions（`.github/workflows/release.yml`），自动编译 x86 / arm 两套 FPK 与 Android APK，并把它们连同 `SHA256SUMS.txt` 一起发布到 Releases。
 
-### FnDepot 应用源
+### Moo 应用源
 
-仓库根目录的 [`fnpack.json`](./fnpack.json) 就是 FnDepot（v2 规范）的外部应用源配置。在飞牛 fnOS 的 FnDepot 里添加源时填写：
+仓库根目录的 [`moo.json`](./moo.json) 是 [Moo](https://github.com/Blue-Mink/moo) 应用中心的第三方源（`schema_version: "moo"`）。在飞牛 fnOS 的 Moo 里「设置 → 应用源设置 → 添加应用源」，任选一种填法：
 
 ```
 https://github.com/ifeng369/go-music-dl
 ```
 
-FnDepot 会读取默认分支上的 `fnpack.json`，从中拿到应用信息、图标和最新版本的安装包地址 / 大小 / SHA256。发布新版本时，`release` 工作流会在上传 Release 资产后用 [`scripts/update_fnpack.py`](./scripts/update_fnpack.py) 自动把该版本的 x86 / arm 包写入 `fnpack.json` 并提交到 `main`，无需手动维护版本号或校验值。
+```
+https://raw.githubusercontent.com/ifeng369/go-music-dl/main/moo.json
+```
+
+填仓库地址时 Moo 会自动到默认分支找 `moo.json`；也可以直接把 JSON 链接粘到首页搜索框预览，不必先加源。
+
+源里包含应用信息、图标、README、分类和最近三个版本的安装包地址 / 大小 / SHA256，Moo 会按当前架构（x86 / arm）自动挑包并校验校验和。发布新版本时，`release` 工作流会在上传 Release 资产后用 [`scripts/update_moo_json.py`](./scripts/update_moo_json.py) 把该版本写入 `moo.json` 并提交到 `main`，无需手动维护版本号或校验值。Moo 会缓存源索引，刚发完版若没看到更新，在源列表点一次「同步」即可。
 
 本地也可以手动更新（例如离线构建之后）：
 
 ```bash
-python3 scripts/update_fnpack.py --repo . --dist dist --version 1.2.1 --tag v1.2.1
+python3 scripts/update_moo_json.py --repo . --dist dist --version 1.2.3 --tag v1.2.3
 ```
+
+> 早期版本用的是 FnDepot 的 `fnpack.json`，该格式已停用；Moo 本身也兼容读取 `fnpack.json`，但同仓库只保留一份索引（`moo.json`）最稳妥。
 
 ---
 
