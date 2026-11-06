@@ -59,7 +59,7 @@ pwsh -NoProfile -File .\build-fpk.ps1 -Arch arm
 
 产物为 `dist/musicdl_<版本>_<架构>.fpk`。安装后在应用中心「Music-DL」打开，默认端口 **18081**，访问 `http://NAS地址:18081/music`；安装向导里可改端口。数据保存在应用数据目录，下载文件默认写入共享文件夹 `musicdl/downloads`（安装时自动创建软链），卸载时可选择是否保留数据。详见 [`fnos/README.md`](./fnos/README.md)。
 
-推送 `v*` 形式的 tag（如 `v1.2.0`）会触发 GitHub Actions（`.github/workflows/release.yml`），自动编译 x86 / arm 两套 FPK 与 Android APK，并把它们连同 `SHA256SUMS.txt` 一起发布到 Releases。
+推送 `v*` 形式的 tag（如 `v1.2.0`）会触发 GitHub Actions（`.github/workflows/release.yml`），自动编译 x86 / arm 两套 FPK 与 Android APK，并把它们连同 `SHA256SUMS.txt` 一起发布到 Releases。发布完成后 workflow 会把版本号同步到 `core/version.go`、`fnos/manifest` 和本页示例，并连同 `fnpack.json` 一起提交到 `main`，无需手工改版本号。
 
 ### FnDepot 应用源
 

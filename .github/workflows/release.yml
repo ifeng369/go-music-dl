@@ -58,6 +58,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Sync version files
+        shell: bash
+        run: bash .github/scripts/sync_version.sh "${{ needs.resolve-version.outputs.version }}"
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -83,6 +87,7 @@ jobs:
 
   build-android:
     name: Build Android APK
+    needs: resolve-version
     runs-on: windows-latest
     environment: release
     steps:
@@ -90,6 +95,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Sync version files
+        shell: bash
+        run: bash .github/scripts/sync_version.sh "${{ needs.resolve-version.outputs.version }}"
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -330,6 +339,11 @@ jobs:
           ref: main
           path: fnpack-repo
 
+      - name: Sync version files
+        shell: bash
+        working-directory: fnpack-repo
+        run: bash .github/scripts/sync_version.sh "${{ needs.resolve-version.outputs.version }}"
+
       - name: Update FnDepot source
         shell: bash
         working-directory: fnpack-repo
@@ -342,18 +356,18 @@ jobs:
             --version "${{ needs.resolve-version.outputs.version }}" \
             --tag "${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', needs.resolve-version.outputs.version) }}"
 
-      - name: Commit fnpack.json
+      - name: Commit fnpack.json and version files
         shell: bash
         working-directory: fnpack-repo
         run: |
-          if git diff --quiet -- fnpack.json; then
-            echo "fnpack.json 无变化，跳过提交"
+          if git diff --quiet -- fnpack.json core/version.go fnos/manifest README.md; then
+            echo "fnpack.json 与版本文件无变化，跳过提交"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add fnpack.json
-          git commit -m "chore(fnpack): 发布 v${{ needs.resolve-version.outputs.version }}"
+          git add fnpack.json core/version.go fnos/manifest README.md
+          git commit -m "chore(release): v${{ needs.resolve-version.outputs.version }}（版本文件与 FnDepot 源）"
           for attempt in 1 2 3; do
             if git push origin HEAD:main; then
               exit 0
@@ -361,5 +375,5 @@ jobs:
             echo "推送失败，第 ${attempt} 次重试前先同步远端 main"
             git pull --rebase origin main
           done
-          echo "::error::无法把 fnpack.json 推送到 main"
+          echo "::error::无法把版本文件与 fnpack.json 推送到 main"
           exit 1
