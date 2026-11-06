@@ -103,18 +103,23 @@ def main():
     release["os_min_version"] = OS_MIN_VERSION
 
     packages = release.setdefault("packages", {})
+    found = 0
     for arch, pattern in ARCH_FILES.items():
         filename = pattern.format(version=version)
         path = os.path.join(args.dist, filename)
         if not os.path.exists(path):
-            print(f"缺少 {arch} 安装包：{path}", file=sys.stderr)
-            return 1
+            print(f"跳过 {arch} 安装包（本次未构建）：{path}", file=sys.stderr)
+            continue
         packages[arch] = {
             "download_url": f"https://github.com/{repository}/releases/download/{tag}/{filename}",
             "sha256": sha256_file(path),
             "size": os.path.getsize(path),
         }
+        found += 1
         print(f"{arch}: {filename} size={packages[arch]['size']} sha256={packages[arch]['sha256']}")
+    if found == 0:
+        print(f"dist 中没有可用安装包：{args.dist}", file=sys.stderr)
+        return 1
 
     # 只保留最近的 100 个版本，避免超过 FnDepot 的单应用版本上限。
     ordered = sorted(releases.keys(), key=version_key, reverse=True)[:100]

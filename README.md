@@ -59,7 +59,7 @@ pwsh -NoProfile -File .\build-fpk.ps1 -Arch arm
 
 产物为 `dist/musicdl_<版本>_<架构>.fpk`。安装后在应用中心「Music-DL」打开，默认端口 **18081**，访问 `http://NAS地址:18081/music`；安装向导里可改端口。数据保存在应用数据目录，下载文件默认写入共享文件夹 `musicdl/downloads`（安装时自动创建软链），卸载时可选择是否保留数据。详见 [`fnos/README.md`](./fnos/README.md)。
 
-推送 `v*` 形式的 tag（如 `v1.2.0`）会触发 GitHub Actions（`.github/workflows/release.yml`），自动编译 x86 / arm 两套 FPK，并把它们连同 `SHA256SUMS.txt` 一起发布到 Releases。发布完成后 workflow 会把版本号同步到 `core/version.go`、`fnos/manifest` 和本页示例，并连同 `fnpack.json` 一起提交到 `main`，无需手工改版本号。
+推送 `v*` 形式的 tag（如 `v1.2.0`）会触发 GitHub Actions（`.github/workflows/release.yml`），自动编译 x86 FPK（arm 暂停构建），并把它们连同 `SHA256SUMS.txt` 一起发布到 Releases。发布完成后 workflow 会把版本号同步到 `core/version.go`、`fnos/manifest` 和本页示例，并连同 `fnpack.json` 一起提交到 `main`，无需手工改版本号。
 
 ### FnDepot 应用源
 
@@ -69,7 +69,7 @@ pwsh -NoProfile -File .\build-fpk.ps1 -Arch arm
 https://github.com/ifeng369/go-music-dl
 ```
 
-FnDepot 会读取默认分支上的 `fnpack.json`，从中拿到应用信息、图标和最新版本的安装包地址 / 大小 / SHA256。发布新版本时，`release` 工作流会在上传 Release 资产后用 [`scripts/update_fnpack.py`](./scripts/update_fnpack.py) 自动把该版本的 x86 / arm 包写入 `fnpack.json` 并提交到 `main`，无需手动维护版本号或校验值。
+FnDepot 会读取默认分支上的 `fnpack.json`，从中拿到应用信息、图标和最新版本的安装包地址 / 大小 / SHA256。发布新版本时，`release` 工作流会在上传 Release 资产后用 [`scripts/update_fnpack.py`](./scripts/update_fnpack.py) 自动把该版本已构建的架构包（缺哪个架构就跳过哪个）写入 `fnpack.json` 并提交到 `main`，无需手动维护版本号或校验值。
 
 本地也可以手动更新（例如离线构建之后）：
 
@@ -185,7 +185,7 @@ TUI 常用按键：
 
 项目合并为一个发布工作流 `.github/workflows/release.yml`（`Release (fnOS)`）。推送 `v*` 形式标签（如 `v1.2.1`）或手动触发时，会依次：
 
-* 编译 x86 / arm 两套 fnOS 安装包（`.fpk`）
+* 编译 x86 fnOS 安装包（`.fpk`，arm 暂停构建）
 * 把 FPK 与 `SHA256SUMS.txt` 发布到 GitHub Releases
 * 同步版本号并更新 FnDepot 源 `fnpack.json`，提交回 `main`
 

@@ -52,8 +52,6 @@ jobs:
         include:
           - arch: x86
             goarch: amd64
-          - arch: arm
-            goarch: arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
