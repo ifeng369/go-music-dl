@@ -36,7 +36,11 @@ const (
 )
 
 // localQualitySourceNames 是参与音质比对的平台，顺序即前端展示优先级。
-var localQualitySourceNames = []string{"netease", "qq", "kugou", "kuwo", "migu", "qianqian", "apple"}
+// 汽水音乐需要本机客户端且依赖会员状态，不参与本地音质替换。
+var localQualitySourceNames = []string{
+	"netease", "qq", "kugou", "kuwo", "migu", "qianqian", "apple",
+	"joox", "bilibili", "jamendo", "fivesing",
+}
 
 var localQualityHTTPClient = &http.Client{Timeout: localQualityProbeTimeout}
 
@@ -91,6 +95,10 @@ func handleLocalQualityOptions(c *gin.Context) {
 	currentBitrate, currentTier := localQualityTrackQuality(track, duration)
 
 	sources := localQualitySources()
+	sourceLabels := make(map[string]string, len(sources))
+	for _, source := range sources {
+		sourceLabels[source] = core.GetSourceDescription(source)
+	}
 	options := collectLocalQualityOptions(track, duration, currentBitrate)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -112,6 +120,7 @@ func handleLocalQualityOptions(c *gin.Context) {
 		},
 		"options":         options,
 		"checked_sources": sources,
+		"source_labels":   sourceLabels,
 	})
 }
 

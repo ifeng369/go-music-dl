@@ -3458,6 +3458,8 @@ async function openLocalQualityMenu(btn) {
 function renderLocalQualityMenu(payload) {
   const local = payload.local || {};
   const options = Array.isArray(payload.options) ? payload.options : [];
+  const sourceLabels = payload.source_labels || {};
+  const checkedSources = Array.isArray(payload.checked_sources) ? payload.checked_sources : [];
   const currentHTML = `
     <div class="local-quality-current">
       <div class="local-quality-current-name">${escapeHTML(local.name || "")}</div>
@@ -3469,22 +3471,37 @@ function renderLocalQualityMenu(payload) {
       </div>
     </div>`;
 
-  if (!options.length) {
-    setLocalQualityBody(
-      `${currentHTML}<div class="local-quality-empty">没有找到可替换的音源，试试先在设置里登录各平台或补充 Cookie。</div>`,
-    );
-    return;
-  }
+  const optionBySource = new Map();
+  options.forEach((option) => {
+    if (option.source) optionBySource.set(option.source, option);
+  });
+  // 有音源的平台按实测码率优先展示，其余平台追加在后面，保证所有源都可见。
+  const orderedSources = [];
+  options.forEach((option) => {
+    if (option.source && !orderedSources.includes(option.source)) orderedSources.push(option.source);
+  });
+  checkedSources.forEach((source) => {
+    if (source && !orderedSources.includes(source)) orderedSources.push(source);
+  });
 
-  const rowsHTML = options
-    .map((option, index) => {
+  const rowsHTML = orderedSources
+    .map((source) => {
+      const option = optionBySource.get(source);
+      const sourceLabel = (option && option.source_label) || sourceLabels[source] || source;
+      if (!option) {
+        return `
+      <div class="local-quality-row is-empty">
+        <span class="local-quality-source">${escapeHTML(sourceLabel)}</span>
+        <span class="local-quality-empty-note">未找到可用音源</span>
+      </div>`;
+      }
       const candidate = option.song || {};
       const songLabel = [candidate.name, candidate.artist].filter(Boolean).join(" - ");
       const scoreText = option.score ? `匹配度 ${Math.round(option.score * 100)}%` : "";
       const titleText = [songLabel, scoreText].filter(Boolean).join(" · ");
       return `
-      <button type="button" class="local-quality-row" data-index="${index}" title="${escapeHTML(titleText)}">
-        <span class="local-quality-source">${escapeHTML(option.source_label || option.source)}</span>
+      <button type="button" class="local-quality-row" data-source="${escapeHTML(source)}" title="${escapeHTML(titleText)}">
+        <span class="local-quality-source">${escapeHTML(sourceLabel)}</span>
         <span class="local-quality-badge tier-${escapeHTML(option.tier || "unknown")}">${escapeHTML(option.quality || "-")}</span>
         <span class="local-quality-size">${escapeHTML(option.size_text || "-")}</span>
         ${option.improvement ? '<span class="local-quality-upgrade">可提升音质</span>' : ""}
@@ -3492,11 +3509,14 @@ function renderLocalQualityMenu(payload) {
     })
     .join("");
 
-  setLocalQualityBody(`${currentHTML}<div class="local-quality-list">${rowsHTML}</div>`);
+  const emptyHint = options.length
+    ? ""
+    : `<div class="local-quality-empty">没有找到可替换的音源，试试先在设置里登录各平台或补充 Cookie。</div>`;
+  setLocalQualityBody(`${currentHTML}${emptyHint}<div class="local-quality-list">${rowsHTML}</div>`);
   if (!localQualityPopover) return;
-  localQualityPopover.querySelectorAll(".local-quality-row").forEach((row) => {
+  localQualityPopover.querySelectorAll(".local-quality-row[data-source]").forEach((row) => {
     row.addEventListener("click", () => {
-      const option = options[Number(row.dataset.index)];
+      const option = optionBySource.get(row.dataset.source);
       if (option) applyLocalQualityOption(local, option, row);
     });
   });
