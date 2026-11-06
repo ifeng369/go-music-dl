@@ -74,7 +74,7 @@ FnDepot 会读取默认分支上的 `fnpack.json`，从中拿到应用信息、�
 本地也可以手动更新（例如离线构建之后）：
 
 ```bash
-python3 scripts/update_fnpack.py --repo . --dist dist --version 1.2.4 --tag v1.2.4
+python3 scripts/update_fnpack.py --repo . --dist dist --version 1.2.5 --tag v1.2.5
 ```
 
 ---

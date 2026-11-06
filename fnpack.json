@@ -27,6 +27,23 @@
       "is_docker": false,
       "service_port": "18081",
       "releases": {
+        "1.2.5": {
+          "changelog": "常规更新与稳定性改进。",
+          "updated_at": "2026-11-06T06:26:07+00:00",
+          "os_min_version": "1.1.8",
+          "packages": {
+            "x86": {
+              "download_url": "https://github.com/ifeng369/go-music-dl/releases/download/v1.2.5/musicdl_1.2.5_x86.fpk",
+              "sha256": "05c00e453afd58178999048d1529be1e8912abf68f41ebba9c655b8311ece088",
+              "size": 15377670
+            },
+            "arm": {
+              "download_url": "https://github.com/ifeng369/go-music-dl/releases/download/v1.2.5/musicdl_1.2.5_arm.fpk",
+              "sha256": "527aea23553d361269c3967549e2de916d6894a16e2237a09d9a7608424730e7",
+              "size": 14249940
+            }
+          }
+        },
         "1.2.3": {
           "changelog": "常规更新与稳定性改进。",
           "updated_at": "2026-11-03T01:39:40+00:00",
