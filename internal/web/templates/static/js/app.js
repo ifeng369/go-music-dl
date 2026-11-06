@@ -3388,7 +3388,7 @@ function setLocalQualityBody(html) {
 
 function positionLocalQualityPopover(popover, anchor) {
   const rect = anchor.getBoundingClientRect();
-  const width = Math.min(336, window.innerWidth - 24);
+  const width = Math.min(560, window.innerWidth - 24);
   popover.style.width = `${width}px`;
   const left = Math.min(Math.max(12, rect.right - width), window.innerWidth - width - 12);
   popover.style.left = `${left}px`;
@@ -3459,7 +3459,6 @@ function renderLocalQualityMenu(payload) {
   const local = payload.local || {};
   const options = Array.isArray(payload.options) ? payload.options : [];
   const sourceLabels = payload.source_labels || {};
-  const checkedSources = Array.isArray(payload.checked_sources) ? payload.checked_sources : [];
   const currentHTML = `
     <div class="local-quality-current">
       <div class="local-quality-current-name">${escapeHTML(local.name || "")}</div>
@@ -3475,26 +3474,17 @@ function renderLocalQualityMenu(payload) {
   options.forEach((option) => {
     if (option.source) optionBySource.set(option.source, option);
   });
-  // 有音源的平台按实测码率优先展示，其余平台追加在后面，保证所有源都可见。
+  // 只展示真正匹配到音源的平台，找不到的一律不显示。
   const orderedSources = [];
   options.forEach((option) => {
     if (option.source && !orderedSources.includes(option.source)) orderedSources.push(option.source);
-  });
-  checkedSources.forEach((source) => {
-    if (source && !orderedSources.includes(source)) orderedSources.push(source);
   });
 
   const rowsHTML = orderedSources
     .map((source) => {
       const option = optionBySource.get(source);
-      const sourceLabel = (option && option.source_label) || sourceLabels[source] || source;
-      if (!option) {
-        return `
-      <div class="local-quality-row is-empty">
-        <span class="local-quality-source">${escapeHTML(sourceLabel)}</span>
-        <span class="local-quality-empty-note">未找到可用音源</span>
-      </div>`;
-      }
+      if (!option) return "";
+      const sourceLabel = option.source_label || sourceLabels[source] || source;
       const candidate = option.song || {};
       const songLabel = [candidate.name, candidate.artist].filter(Boolean).join(" - ");
       const scoreText = option.score ? `匹配度 ${Math.round(option.score * 100)}%` : "";

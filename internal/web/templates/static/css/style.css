@@ -2587,6 +2587,8 @@ body.karaoke-lyrics-active .aplayer .aplayer-lrc p.aplayer-lrc-current {
     position: fixed;
     z-index: 1200;
     box-sizing: border-box;
+    width: min(560px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
     padding: 12px;
     border: 1px solid #d9eee5;
     border-radius: 14px;
@@ -2601,7 +2603,7 @@ body.karaoke-lyrics-active .aplayer .aplayer-lrc p.aplayer-lrc-current {
 .local-quality-title { color:var(--text-main, #0f172a); font-size:13px; font-weight:800; }
 .local-quality-close { border:none; background:transparent; color:#94a3b8; font-size:18px; line-height:1; padding:0 2px; cursor:pointer; }
 .local-quality-close:hover { color:#0f172a; }
-.local-quality-body { overflow-y:auto; min-height:0; }
+.local-quality-body { overflow-y:auto; overflow-x:hidden; min-height:0; }
 .local-quality-loading, .local-quality-empty { display:flex; align-items:center; justify-content:center; gap:8px; padding:22px 10px; color:#64748b; font-size:12px; font-weight:700; text-align:center; }
 .local-quality-empty.is-error { color:#dc2626; }
 .local-quality-current { padding:2px 2px 10px; border-bottom:1px solid #eef5f1; }
@@ -2613,10 +2615,7 @@ body.karaoke-lyrics-active .aplayer .aplayer-lrc p.aplayer-lrc-current {
 .local-quality-row { display:grid; grid-template-columns:minmax(0, 1fr) auto auto; align-items:center; gap:8px; width:100%; padding:9px 10px; border:1px solid #e6f2ec; border-radius:10px; background:#fbfefd; cursor:pointer; text-align:left; transition:border-color 0.15s ease, background-color 0.15s ease; }
 .local-quality-row:hover:not(:disabled) { border-color:#34d399; background:#ecfdf5; }
 .local-quality-row:disabled { opacity:.6; cursor:default; }
-.local-quality-row.is-empty { cursor:default; border-style:dashed; background:#fbfcfc; }
-.local-quality-row.is-empty:hover { border-color:#e6f2ec; background:#fbfcfc; }
 .local-quality-source { color:#0f172a; font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.local-quality-empty-note { grid-column:2 / -1; color:#94a3b8; font-size:11px; font-weight:700; text-align:right; white-space:nowrap; }
 .local-quality-badge { padding:2px 7px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:800; white-space:nowrap; }
 .local-quality-badge.tier-hires { background:#fef3c7; color:#b45309; }
 .local-quality-badge.tier-lossless { background:#dcfce7; color:#15803d; }
