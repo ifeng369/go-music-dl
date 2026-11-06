@@ -1793,6 +1793,12 @@ func isSwitchSourceAllowed(source string, current string) bool {
 }
 
 func searchSwitchSourceCandidates(source string, fn func(string) ([]model.Song, error), keyword string, name string, artist string, origDuration int) []switchCandidate {
+	return searchSwitchSourceCandidatesEx(source, fn, keyword, name, artist, origDuration, true)
+}
+
+// searchSwitchSourceCandidatesEx 同上，可关闭时长硬过滤：filterDuration=false 时
+// 时长差异过大也照常返回（音质替换列表每个候选都显示时长，由用户自己挑）。
+func searchSwitchSourceCandidatesEx(source string, fn func(string) ([]model.Song, error), keyword string, name string, artist string, origDuration int, filterDuration bool) []switchCandidate {
 	type searchResponse struct {
 		songs []model.Song
 		err   error
@@ -1837,7 +1843,7 @@ func searchSwitchSourceCandidates(source string, fn func(string) ([]model.Song, 
 		durDiff := 0
 		if origDuration > 0 && cand.Duration > 0 {
 			durDiff = core.IntAbs(origDuration - cand.Duration)
-			if !core.IsDurationClose(origDuration, cand.Duration) {
+			if filterDuration && !core.IsDurationClose(origDuration, cand.Duration) {
 				continue
 			}
 		}

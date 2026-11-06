@@ -190,7 +190,7 @@ func buildLocalQualityOption(source string, track *localMusicTrack, duration int
 		keyword = name + " " + artist
 	}
 
-	candidates := searchSwitchSourceCandidates(source, searchFn, keyword, name, artist, duration)
+	candidates := searchSwitchSourceCandidatesEx(source, searchFn, keyword, name, artist, duration, false)
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -280,9 +280,8 @@ func localQualityIsSameSong(name, artist, otherName, otherArtist string, duratio
 			return false
 		}
 	}
-	if durationA > 0 && durationB > 0 && !core.IsDurationClose(durationA, durationB) {
-		return false
-	}
+	// 时长不再作为硬性过滤：列表里每个候选都带时长，由用户自己挑。
+	// （片段/试听版与各平台完整版的差距会远超阈值，一比就把整源掐掉。）
 	return true
 }
 
@@ -327,9 +326,14 @@ func probeLocalQualityCandidate(source string, downloadFn func(*model.Song) (str
 		return nil
 	}
 
+	// 码率按候选自身时长估算（时长不再与本地对齐，用本地时长会把长版本算爆）。
 	bitrate := 0
-	if duration > 0 {
-		bitrate = int(size * 8 / int64(duration) / 1000)
+	bitrateDuration := song.Duration
+	if bitrateDuration <= 0 {
+		bitrateDuration = duration
+	}
+	if bitrateDuration > 0 {
+		bitrate = int(size * 8 / int64(bitrateDuration) / 1000)
 	}
 	if bitrate <= 0 {
 		bitrate = song.Bitrate
