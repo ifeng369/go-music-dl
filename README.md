@@ -59,7 +59,7 @@ pwsh -NoProfile -File .\build-fpk.ps1 -Arch arm
 
 产物为 `dist/musicdl_<版本>_<架构>.fpk`。安装后在应用中心「Music-DL」打开，默认端口 **18081**，访问 `http://NAS地址:18081/music`；安装向导里可改端口。数据保存在应用数据目录，下载文件默认写入共享文件夹 `musicdl/downloads`（安装时自动创建软链），卸载时可选择是否保留数据。详见 [`fnos/README.md`](./fnos/README.md)。
 
-推送 `v*` 形式的 tag（如 `v1.2.0`）会触发 GitHub Actions（`.github/workflows/release.yml`），自动编译 x86 / arm 两套 FPK 与 Android APK，并把它们连同 `SHA256SUMS.txt` 一起发布到 Releases。发布完成后 workflow 会把版本号同步到 `core/version.go`、`fnos/manifest` 和本页示例，并连同 `fnpack.json` 一起提交到 `main`，无需手工改版本号。
+推送 `v*` 形式的 tag（如 `v1.2.0`）会触发 GitHub Actions（`.github/workflows/release.yml`），自动编译 x86 / arm 两套 FPK，并把它们连同 `SHA256SUMS.txt` 一起发布到 Releases。发布完成后 workflow 会把版本号同步到 `core/version.go`、`fnos/manifest` 和本页示例，并连同 `fnpack.json` 一起提交到 `main`，无需手工改版本号。
 
 ### FnDepot 应用源
 
@@ -183,11 +183,13 @@ TUI 常用按键：
 
 ## GitHub Actions 自动构建
 
-项目合并为一个发布工作流 `.github/workflows/release.yml`（`Release (fnOS + Android)`）。推送 `v*` 形式标签（如 `v1.2.1`）或手动触发时，会并行：
+项目合并为一个发布工作流 `.github/workflows/release.yml`（`Release (fnOS)`）。推送 `v*` 形式标签（如 `v1.2.1`）或手动触发时，会依次：
 
 * 编译 x86 / arm 两套 fnOS 安装包（`.fpk`）
-* 在 `windows-latest` 上编译 Android APK
-* 把 FPK、APK 与 `SHA256SUMS.txt` 一并发布到 GitHub Releases
+* 把 FPK 与 `SHA256SUMS.txt` 发布到 GitHub Releases
+* 同步版本号并更新 FnDepot 源 `fnpack.json`，提交回 `main`
+
+Android APK 不再由 Actions 构建，需要时请按下面的「本地构建 APK」自行打包。
 
 其余构建（Docker 镜像、iOS、每日构建）不再由 Actions 执行。
 
@@ -230,21 +232,7 @@ package_app.bat
 adb install -r music-dl.apk
 ```
 
-#### 2. Release 流程自动构建 APK
-
-`.github/workflows/release.yml` 中的 `build-android` 任务会在发布时运行：
-
-* 安装 Go、JDK 17、Android SDK
-* 安装 `platform-tools`、`platforms;android-33`、`build-tools;34.0.0`、`ndk;27.0.12077973`
-* 下载 Android `arm` / `arm64` / `x86` / `x86_64` 的 `ffmpeg` 与 `ffprobe`
-* 执行 `package_app.bat`
-* 构建 APK 后注入 `assets/ffmpeg/<abi>/ffmpeg` 与 `assets/ffmpeg/<abi>/ffprobe`，重新 `zipalign` 并用发布 keystore 签名
-* 校验三个 APK 都包含对应 ABI 的 `ffmpeg/ffprobe`，不包含旧的 `libffmpeg.so/libffprobe.so` 条目，且签名有效
-* 上传 `music-dl_arm64-v8a.apk`、`music-dl_x86_64.apk`、`music-dl.apk` 到 Actions Artifacts 和 GitHub Release
-
-发布后可在 [Releases](https://github.com/guohuiyuan/go-music-dl/releases) 下载三个 APK，推荐优先使用 `music-dl_arm64-v8a.apk`；极个别设备若无法安装/运行，再下载 `music-dl.apk`（无分片兼容包）。
-
-关于签名密钥：工作流优先使用仓库 Secret `ANDROID_KEYSTORE_BASE64`（`release.keystore` 的 Base64）与 `ANDROID_KEYSTORE_PASSWORD`；两者未配置时会回退到仓库内置的 `.github/android/release.keystore.b64`（密码见工作流中的默认值）。内置密钥方便开箱即用，但私钥随仓库公开，**只适合个人或内部分发**；正式分发建议替换为自建 keystore 并通过 Secrets 注入，同时保证后续版本使用同一签名以便覆盖升级。
+关于签名密钥：本地构建通过环境变量 `ANDROID_KEYSTORE_FILE`（keystore 路径）与 `ANDROID_KEYSTORE_PASSWORD` 指定签名密钥；未配置时脚本会回退到仓库内置的 `.github/android/release.keystore.b64`（密码见 `package_app.bat` 中的默认值）。内置密钥方便开箱即用，但私钥随仓库公开，**只适合个人或内部分发**；正式分发建议替换为自建 keystore 并通过环境变量注入，同时保证后续版本使用同一签名以便覆盖升级。
 
 自建 keystore 的 Base64 生成方式（Windows PowerShell）：
 
@@ -252,7 +240,7 @@ adb install -r music-dl.apk
 [Convert]::ToBase64String([IO.File]::ReadAllBytes('release.keystore')) | Set-Clipboard
 ```
 
-#### 3. Java 17 与 Build-Tools 版本说明（重点）
+#### 2. Java 17 与 Build-Tools 版本说明（重点）
 
 高版本（`34.0.0` 及以上）的 Android Build-Tools 已修复旧版 `d8.bat` 脚本兼容性问题，可正常配合 Java 17 使用。
 
