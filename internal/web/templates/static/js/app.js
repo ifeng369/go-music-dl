@@ -3355,6 +3355,7 @@ function renderLocalMusicPageCard(track) {
 }
 
 let localQualityPopover = null;
+let localQualityAnchor = null;
 let localQualityRequestSeq = 0;
 
 function closeLocalQualityMenu() {
@@ -3363,8 +3364,20 @@ function closeLocalQualityMenu() {
     localQualityPopover.remove();
     localQualityPopover = null;
   }
+  localQualityAnchor = null;
   document.removeEventListener("click", handleLocalQualityOutsideClick, true);
   document.removeEventListener("keydown", handleLocalQualityKeydown, true);
+  window.removeEventListener("scroll", repositionLocalQualityPopover, true);
+  window.removeEventListener("resize", repositionLocalQualityPopover);
+}
+
+// 弹层固定定位在视口，页面/列表滚动时按锚点重算位置，保持跟随。
+function repositionLocalQualityPopover() {
+  if (!localQualityPopover || !localQualityAnchor || !localQualityAnchor.isConnected) {
+    closeLocalQualityMenu();
+    return;
+  }
+  positionLocalQualityPopover(localQualityPopover, localQualityAnchor);
 }
 
 function handleLocalQualityOutsideClick(event) {
@@ -3387,19 +3400,23 @@ function setLocalQualityBody(html) {
 }
 
 function positionLocalQualityPopover(popover, anchor) {
-  const rect = anchor.getBoundingClientRect();
   const width = Math.min(560, window.innerWidth - 24);
   popover.style.width = `${width}px`;
-  const left = Math.min(Math.max(12, rect.right - width), window.innerWidth - width - 12);
-  popover.style.left = `${left}px`;
-  popover.style.top = `${rect.bottom + 8}px`;
-  requestAnimationFrame(() => {
-    if (!popover.isConnected) return;
+  const place = () => {
+    if (!popover.isConnected || !anchor.isConnected) return;
+    const rect = anchor.getBoundingClientRect();
+    const left = Math.min(Math.max(12, rect.right - width), window.innerWidth - width - 12);
+    popover.style.left = `${left}px`;
     const height = popover.offsetHeight;
-    if (rect.bottom + 8 + height > window.innerHeight - 12) {
-      popover.style.top = `${Math.max(12, rect.top - height - 8)}px`;
+    let top = rect.bottom + 8;
+    if (top + height > window.innerHeight - 12) {
+      const above = rect.top - height - 8;
+      top = above >= 12 ? above : window.innerHeight - height - 12;
     }
-  });
+    popover.style.top = `${Math.max(12, top)}px`;
+  };
+  place();
+  requestAnimationFrame(place);
 }
 
 async function openLocalQualityMenu(btn) {
@@ -3424,10 +3441,13 @@ async function openLocalQualityMenu(btn) {
     </div>`;
   document.body.appendChild(popover);
   localQualityPopover = popover;
+  localQualityAnchor = btn;
   positionLocalQualityPopover(popover, btn);
   popover.querySelector(".local-quality-close")?.addEventListener("click", closeLocalQualityMenu);
   document.addEventListener("click", handleLocalQualityOutsideClick, true);
   document.addEventListener("keydown", handleLocalQualityKeydown, true);
+  window.addEventListener("scroll", repositionLocalQualityPopover, true);
+  window.addEventListener("resize", repositionLocalQualityPopover);
 
   const seq = localQualityRequestSeq;
   try {
@@ -3459,12 +3479,14 @@ function renderLocalQualityMenu(payload) {
   const local = payload.local || {};
   const options = Array.isArray(payload.options) ? payload.options : [];
   const sourceLabels = payload.source_labels || {};
+  const durationText = (value) => (Number(value) > 0 ? formatDuration(Number(value)) : "-");
   const currentHTML = `
     <div class="local-quality-current">
       <div class="local-quality-current-name">${escapeHTML(local.name || "")}</div>
       <div class="local-quality-current-meta">
         <span class="local-quality-tag">${escapeHTML(String(local.ext || "").toUpperCase() || "-")}</span>
         <span class="local-quality-tag">${escapeHTML(local.bitrate_text || "-")}</span>
+        <span class="local-quality-tag">${durationText(local.duration)}</span>
         <span class="local-quality-tag">${escapeHTML(local.size_text || "-")}</span>
         <span class="local-quality-tag is-tier">当前 ${escapeHTML(local.tier_text || "未知")}</span>
       </div>
@@ -3486,13 +3508,15 @@ function renderLocalQualityMenu(payload) {
       if (!option) return "";
       const sourceLabel = option.source_label || sourceLabels[source] || source;
       const candidate = option.song || {};
+      const optionDuration = option.duration || candidate.duration || 0;
       const songLabel = [candidate.name, candidate.artist].filter(Boolean).join(" - ");
       const scoreText = option.score ? `匹配度 ${Math.round(option.score * 100)}%` : "";
-      const titleText = [songLabel, scoreText].filter(Boolean).join(" · ");
+      const titleText = [songLabel, scoreText, durationText(optionDuration)].filter(Boolean).join(" · ");
       return `
       <button type="button" class="local-quality-row" data-source="${escapeHTML(source)}" title="${escapeHTML(titleText)}">
         <span class="local-quality-source">${escapeHTML(sourceLabel)}</span>
         <span class="local-quality-badge tier-${escapeHTML(option.tier || "unknown")}">${escapeHTML(option.quality || "-")}</span>
+        <span class="local-quality-duration">${durationText(optionDuration)}</span>
         <span class="local-quality-size">${escapeHTML(option.size_text || "-")}</span>
         ${option.improvement ? '<span class="local-quality-upgrade">可提升音质</span>' : ""}
       </button>`;

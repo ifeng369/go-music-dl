@@ -2612,7 +2612,7 @@ body.karaoke-lyrics-active .aplayer .aplayer-lrc p.aplayer-lrc-current {
 .local-quality-tag { padding:2px 7px; border-radius:999px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:700; }
 .local-quality-tag.is-tier { background:#ecfdf5; color:#047857; }
 .local-quality-list { display:flex; flex-direction:column; gap:6px; padding-top:8px; }
-.local-quality-row { display:grid; grid-template-columns:minmax(0, 1fr) auto auto; align-items:center; gap:8px; width:100%; padding:9px 10px; border:1px solid #e6f2ec; border-radius:10px; background:#fbfefd; cursor:pointer; text-align:left; transition:border-color 0.15s ease, background-color 0.15s ease; }
+.local-quality-row { display:grid; grid-template-columns:minmax(0, 1fr) auto auto auto; align-items:center; gap:8px; width:100%; padding:9px 10px; border:1px solid #e6f2ec; border-radius:10px; background:#fbfefd; cursor:pointer; text-align:left; transition:border-color 0.15s ease, background-color 0.15s ease; }
 .local-quality-row:hover:not(:disabled) { border-color:#34d399; background:#ecfdf5; }
 .local-quality-row:disabled { opacity:.6; cursor:default; }
 .local-quality-source { color:#0f172a; font-size:12px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -2621,6 +2621,7 @@ body.karaoke-lyrics-active .aplayer .aplayer-lrc p.aplayer-lrc-current {
 .local-quality-badge.tier-lossless { background:#dcfce7; color:#15803d; }
 .local-quality-badge.tier-high { background:#dbeafe; color:#1d4ed8; }
 .local-quality-size { color:#64748b; font-size:11px; font-weight:700; white-space:nowrap; }
+.local-quality-duration { color:#64748b; font-size:11px; font-weight:700; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .local-quality-upgrade { grid-column:1 / -1; color:#047857; font-size:11px; font-weight:800; }
 
 /* 本地音乐一键音质提升 */
